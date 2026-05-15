@@ -6,6 +6,8 @@
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply ticktick_sync --local",
+    "db:migrate:remote": "wrangler d1 migrations apply ticktick_sync",
     "test": "vitest",
     "cf-typegen": "wrangler types"
   },
@@ -15,5 +17,8 @@
     "typescript": "^5.5.2",
     "vitest": "~3.2.0",
     "wrangler": "^4.91.0"
+  },
+  "dependencies": {
+    "hono": "^4.12.18"
   }
 }
