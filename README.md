@@ -2,7 +2,7 @@
 
 Cloudflare Workers service built with TypeScript, Hono, and D1 that syncs GitHub issues and/or Azure DevOps Taskboard work items into TickTick tasks.
 
-**New here?** Follow the full setup guide: [ONBOARDING.md](./ONBOARDING.md)
+**New here?** Open the interactive setup guide: [ONBOARDING.html](./ONBOARDING.html)
 
 GitHub and Azure DevOps are **independent optional sources** — enable either one, or both.
 
@@ -191,7 +191,7 @@ AZURE_DEVOPS_WEBHOOK_SECRET=your_azure_devops_webhook_secret
 
 ## Quick start
 
-Full walkthrough (where to get every key, local + production): **[ONBOARDING.md](./ONBOARDING.md)**
+Full walkthrough (where to get every key, local + production): **[ONBOARDING.html](./ONBOARDING.html)**
 
 ```bash
 npm install
@@ -207,7 +207,7 @@ Then:
 1. Open `/auth/ticktick/start` (register `http://localhost:8787/auth/ticktick/callback` in TickTick first)
 2. `GET /debug/projects` with `Authorization: Bearer <DEBUG_TOKEN>`
 3. Set `GITHUB_TICKTICK_PROJECT_ID` and `AZURE_DEVOPS_TICKTICK_PROJECT_ID`
-4. Backfill / configure webhooks as described in ONBOARDING.md
+4. Backfill / configure webhooks as described in ONBOARDING.html
 
 ## Backfill behavior
 
