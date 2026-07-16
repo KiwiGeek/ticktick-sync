@@ -5,6 +5,7 @@ export interface AppBindings {
 	GITHUB_WEBHOOK_SECRET: string;
 	GITHUB_TOKEN?: string;
 	TICKTICK_PROJECT_ID: string;
+	AZURE_DEVOPS_TICKTICK_PROJECT_ID?: string;
 	GITHUB_LOGIN: string;
 	DEBUG_TOKEN?: string;
 	AZURE_DEVOPS_ORG?: string;

@@ -109,7 +109,9 @@ Tags: none
 ### Non-secret vars in `wrangler.jsonc`
 
 - `TICKTICK_PROJECT_ID`
-  TickTick project/list ID where tasks should be created.
+  TickTick project/list ID for GitHub-synced tasks. Also used as the Azure DevOps fallback when `AZURE_DEVOPS_TICKTICK_PROJECT_ID` is unset.
+- `AZURE_DEVOPS_TICKTICK_PROJECT_ID`
+  TickTick project/list ID for Azure DevOps-synced tasks. Leave empty or omit to use `TICKTICK_PROJECT_ID`.
 - `GITHUB_LOGIN`
   Your GitHub username. Informational config.
 - `AZURE_DEVOPS_ORG`
@@ -197,7 +199,8 @@ In `wrangler.jsonc`:
 
 ```jsonc
 "vars": {
-  "TICKTICK_PROJECT_ID": "your_ticktick_project_id",
+  "TICKTICK_PROJECT_ID": "your_github_ticktick_list_id",
+  "AZURE_DEVOPS_TICKTICK_PROJECT_ID": "your_azure_devops_ticktick_list_id",
   "GITHUB_LOGIN": "your_github_username",
   "AZURE_DEVOPS_ORG": "your-org",
   "AZURE_DEVOPS_PROJECT": "your-project",
@@ -245,7 +248,7 @@ http://localhost:8787/auth/ticktick/start
 curl -H "Authorization: Bearer YOUR_DEBUG_TOKEN" http://localhost:8787/debug/projects
 ```
 
-4. If needed, copy a project `id` into `TICKTICK_PROJECT_ID` and restart `npm run dev`.
+4. If needed, copy list `id` values into `TICKTICK_PROJECT_ID` (GitHub) and `AZURE_DEVOPS_TICKTICK_PROJECT_ID` (Azure DevOps), then restart `npm run dev`.
 
 ### 8. Smoke-test Azure DevOps backfill
 
@@ -291,8 +294,8 @@ You must register the callback URL in the TickTick developer app before OAuth wi
 
 1. Complete TickTick OAuth using `/auth/ticktick/start`
 2. Call `GET /debug/projects` with your `DEBUG_TOKEN`
-3. Copy the `id` of the TickTick project/list you want to use
-4. Put that value into `TICKTICK_PROJECT_ID` in `wrangler.jsonc`
+3. Copy the `id` of each TickTick project/list you want to use
+4. Put the GitHub list id into `TICKTICK_PROJECT_ID` and the Azure DevOps list id into `AZURE_DEVOPS_TICKTICK_PROJECT_ID` in `wrangler.jsonc`
 
 ## Deploying to Cloudflare
 
@@ -304,7 +307,8 @@ In `wrangler.jsonc`, set:
 
 ```jsonc
 "vars": {
-  "TICKTICK_PROJECT_ID": "your_real_project_id",
+  "TICKTICK_PROJECT_ID": "your_github_ticktick_list_id",
+  "AZURE_DEVOPS_TICKTICK_PROJECT_ID": "your_azure_devops_ticktick_list_id",
   "GITHUB_LOGIN": "your_github_username",
   "AZURE_DEVOPS_ORG": "your-org",
   "AZURE_DEVOPS_PROJECT": "your-project",

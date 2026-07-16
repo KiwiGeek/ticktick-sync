@@ -103,12 +103,22 @@ const buildSyncedItemRow = (
 	updated_at: new Date().toISOString(),
 });
 
+const resolveTickTickProjectId = (env: AppBindings, source: string): string => {
+	if (source === AZURE_DEVOPS_SOURCE) {
+		const azureProjectId = env.AZURE_DEVOPS_TICKTICK_PROJECT_ID?.trim();
+		if (azureProjectId && !/^YOUR[_-]/i.test(azureProjectId)) {
+			return azureProjectId;
+		}
+	}
+	return env.TICKTICK_PROJECT_ID;
+};
+
 const syncItemToTickTick = async (
 	env: AppBindings,
 	item: SyncableItem,
 ): Promise<{ action: SyncAction }> => {
 	const db = getDatabase(env);
-	const projectId = env.TICKTICK_PROJECT_ID;
+	const projectId = resolveTickTickProjectId(env, item.source);
 	const existing = await db.getSyncedItem(item.source, item.sourceRepo, item.sourceItemId);
 
 	if (item.action === "closed") {
