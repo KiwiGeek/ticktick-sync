@@ -585,11 +585,14 @@
         <section class="panel">
           <h3>Jump to</h3>
           <ul class="nav-list">
-            <li><a href="#questionnaire">Questionnaire</a></li>
-            <li><a href="#credentials">Credential checklist</a></li>
-            <li><a href="#keys">Enter your keys</a></li>
-            <li><a href="#local">Local setup</a></li>
-            <li><a href="#deploy">Production deploy</a></li>
+            <li><a href="#questionnaire">1. Questionnaire</a></li>
+            <li><a href="#cloudflare">2. Cloudflare + Worker URL</a></li>
+            <li><a href="#keys-invent">3. Invent secrets</a></li>
+            <li><a href="#keys-ticktick">4. TickTick developer app</a></li>
+            <li><a href="#keys-sources">5. Source credentials</a></li>
+            <li><a href="#local">6. Local Worker</a></li>
+            <li><a href="#keys-lists">7. TickTick list IDs</a></li>
+            <li><a href="#deploy">8. Production deploy</a></li>
             <li><a href="#github">GitHub setup</a></li>
             <li><a href="#azure">Azure DevOps setup</a></li>
             <li><a href="#verify">Verification</a></li>
@@ -610,8 +613,9 @@
               <div class="eyebrow">Step 1</div>
               <h2>Choose what you want to set up</h2>
               <p>
-                The rest of the page updates to match these choices. Work top to bottom:
-                pick sources → collect credentials → local setup → deploy → export your recreation sheet.
+                Work top to bottom in this order:
+                pick sources → Cloudflare (so you know your Worker URL) → invent secrets →
+                TickTick developer app → source credentials → local Worker → list IDs → production deploy.
               </p>
             </div>
 
@@ -703,43 +707,95 @@
           </div>
         </section>
 
-        <section class="panel" id="credentials">
+        <section class="panel" id="cloudflare">
           <div class="eyebrow">Step 2</div>
-          <h2>Collect the right credentials</h2>
-          <p>Start with the always-required TickTick + Cloudflare setup, then only gather source-specific credentials for the sources you enabled.</p>
-
-          <div class="callout success">
-            <strong>Always required</strong>
-            TickTick OAuth credentials and a `DEBUG_TOKEN` are required no matter which source you choose.
+          <h2>Cloudflare account and Worker URL</h2>
+          <p>
+            Do this <strong>before</strong> creating the TickTick developer app.
+            TickTick needs your production callback URL, which comes from the Worker hostname you choose here.
+          </p>
+          <div class="timeline">
+            <li>
+              <strong>Log in to Cloudflare</strong>
+              <div class="code-block">
+                <button class="copy-btn" data-copy-target="wrangler-login">Copy</button>
+                <pre id="wrangler-login">npx wrangler login</pre>
+              </div>
+            </li>
+            <li>
+              <strong>Confirm or create the D1 database</strong>
+              <p>The repo references a D1 database named <code>ticktick_sync</code>. Create one if this is a new account/project:</p>
+              <div class="code-block">
+                <button class="copy-btn" data-copy-target="d1-create">Copy</button>
+                <pre id="d1-create">npx wrangler d1 create ticktick_sync</pre>
+              </div>
+              <p class="footer-note">Paste the returned <code>database_id</code> into <code>wrangler.jsonc</code> if needed.</p>
+            </li>
+            <li>
+              <strong>Decide your production Worker hostname</strong>
+              <p>
+                After your first deploy (or from the Cloudflare dashboard), you will have a hostname like
+                <code>ticktick-sync.&lt;account&gt;.workers.dev</code> or a custom domain.
+                Enter it below so later steps can show the exact TickTick callback URL.
+              </p>
+              <div class="key-field">
+                <label for="workerHost">
+                  <span>Production Worker hostname</span>
+                  <span class="kind">not a secret</span>
+                </label>
+                <div class="hint">Host only — no <code>https://</code> and no path.</div>
+                <input
+                  id="workerHost"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="ticktick-sync.your-subdomain.workers.dev"
+                />
+              </div>
+              <p class="footer-note" id="workerHostPreview"></p>
+            </li>
           </div>
-
-          <div id="credentialTables"></div>
+          <div class="callout success">
+            <strong>You can finish deploy later</strong>
+            Knowing (or choosing) the hostname is enough for TickTick registration.
+            Full production deploy happens in Step 8 after secrets and local OAuth.
+          </div>
         </section>
 
-        <section class="panel" id="keys">
-          <div class="eyebrow">Step 2b</div>
-          <h2>Enter the keys you generated</h2>
+        <section class="panel" id="keys-invent">
+          <div class="eyebrow">Step 3</div>
+          <h2>Invent the secrets you control</h2>
           <p>
-            Each field below shows <strong>where to create or find</strong> that value.
-            Paste the real values as you create them — the generated
-            <code>.dev.vars</code>, <code>wrangler.jsonc</code> snippet, verification commands,
-            JSON export, and PDF recreation sheet will all use these values.
+            These are not issued by a provider — you create them.
+            Fields with <em>Generate</em> can invent a browser value; prefer <code>openssl rand -hex 32</code> when you can.
           </p>
           <div class="callout warning">
             <strong>Treat exports as secret</strong>
             If you fill these fields, exported JSON/PDF can contain live secrets. Store those files privately.
           </div>
-          <div class="callout success">
-            <strong>Generate random secrets here</strong>
-            Secret fields marked with <em>Generate</em> can invent a value in the browser.
-            Prefer <code>openssl rand -hex 32</code> when you can — browser-generated values are convenient, but not as cryptographically strong as OpenSSL.
-          </div>
-          <div class="key-grid" id="keysForm"></div>
+          <div class="key-grid" id="keysInventForm"></div>
+        </section>
+
+        <section class="panel" id="keys-ticktick">
+          <div class="eyebrow">Step 4</div>
+          <h2>Create the TickTick developer app</h2>
+          <p>
+            Now that Cloudflare/local URLs are known, register the TickTick OAuth app and paste the client credentials.
+          </p>
+          <div class="callout success" id="ticktickCallbackCallout"></div>
+          <div class="key-grid" id="keysTicktickForm"></div>
+        </section>
+
+        <section class="panel" id="keys-sources">
+          <div class="eyebrow">Step 5</div>
+          <h2>Source credentials</h2>
+          <p>Gather GitHub and/or Azure DevOps account values for the sources you enabled. List IDs come later, after OAuth.</p>
+          <div class="key-grid" id="keysSourcesForm"></div>
         </section>
 
         <section class="panel" id="local">
-          <div class="eyebrow">Step 3</div>
-          <h2>Local setup</h2>
+          <div class="eyebrow">Step 6</div>
+          <h2>Local Worker setup</h2>
           <div class="timeline">
             <li>
               <strong>Install the project</strong>
@@ -756,7 +812,7 @@ npm install</pre>
                 <button class="copy-btn" data-copy-target="dev-vars">Copy</button>
                 <pre id="dev-vars"></pre>
               </div>
-              <p class="footer-note">Save this as <code>.dev.vars</code>. Do not commit it.</p>
+              <p class="footer-note">Save this as <code>.dev.vars</code>. Do not commit it. Values come from Steps 3–5.</p>
             </li>
             <li>
               <strong>Set non-secret Worker vars in <code>wrangler.jsonc</code></strong>
@@ -786,7 +842,7 @@ curl http://localhost:8787/health</pre>
             <li>
               <strong>Complete local TickTick OAuth</strong>
               <ul class="compact-list">
-                <li>Register <code>http://localhost:8787/auth/ticktick/callback</code> in the TickTick developer app.</li>
+                <li>Confirm <code>http://localhost:8787/auth/ticktick/callback</code> is registered in TickTick (Step 4).</li>
                 <li>Open <code>http://localhost:8787/auth/ticktick/start</code>.</li>
                 <li>Approve access and confirm the success JSON response.</li>
               </ul>
@@ -803,25 +859,21 @@ curl http://localhost:8787/health</pre>
           </div>
         </section>
 
+        <section class="panel" id="keys-lists">
+          <div class="eyebrow">Step 7</div>
+          <h2>Enter TickTick list IDs</h2>
+          <p>
+            Paste the list <code>id</code> values from <code>/debug/projects</code> into the destination lists for each enabled source.
+            Then put the same values into <code>wrangler.jsonc</code> / production vars.
+          </p>
+          <div class="key-grid" id="keysListsForm"></div>
+        </section>
+
         <section class="panel" id="deploy">
-          <div class="eyebrow">Step 4</div>
-          <h2>Deploy to Cloudflare</h2>
+          <div class="eyebrow">Step 8</div>
+          <h2>Production deploy</h2>
+          <p>Push secrets, migrate remote D1, deploy the Worker, then complete production TickTick OAuth on the hostname from Step 2.</p>
           <div class="timeline">
-            <li>
-              <strong>Log in to Cloudflare</strong>
-              <div class="code-block">
-                <button class="copy-btn" data-copy-target="wrangler-login">Copy</button>
-                <pre id="wrangler-login">npx wrangler login</pre>
-              </div>
-            </li>
-            <li>
-              <strong>Confirm or create the D1 database</strong>
-              <p>The repo already references a D1 database named <code>ticktick_sync</code>. If you are setting up a new Cloudflare project/account, create one first:</p>
-              <div class="code-block">
-                <button class="copy-btn" data-copy-target="d1-create">Copy</button>
-                <pre id="d1-create">npx wrangler d1 create ticktick_sync</pre>
-              </div>
-            </li>
             <li>
               <strong>Set production secrets</strong>
               <div class="code-block">
@@ -836,27 +888,26 @@ curl http://localhost:8787/health</pre>
                 <pre id="deploy-commands">npm run db:migrate:remote
 npm run deploy</pre>
               </div>
+              <p class="footer-note">If the deployed hostname differs from Step 2, update the hostname field and add the matching TickTick callback.</p>
             </li>
             <li>
               <strong>Complete production TickTick OAuth</strong>
-              <ul class="compact-list">
-                <li>Add <code>https://&lt;your-worker&gt;.workers.dev/auth/ticktick/callback</code> to the TickTick app.</li>
-                <li>Open <code>https://&lt;your-worker&gt;.workers.dev/auth/ticktick/start</code>.</li>
-                <li>Verify with <code>/debug/projects</code> using your <code>DEBUG_TOKEN</code>.</li>
-              </ul>
+              <ul class="compact-list" id="prodOauthSteps"></ul>
             </li>
           </div>
         </section>
 
         <section class="panel" id="github">
-          <div class="eyebrow">Optional</div>
-          <h2>GitHub setup</h2>
+          <div class="eyebrow">Step 9 · if enabled</div>
+          <h2>GitHub webhook setup</h2>
+          <p class="footer-note" style="margin-top:0;">Use the secrets and Worker URL from earlier steps. This section is only about wiring GitHub to the deployed Worker.</p>
           <div id="githubContent"></div>
         </section>
 
         <section class="panel" id="azure">
-          <div class="eyebrow">Optional</div>
-          <h2>Azure DevOps setup</h2>
+          <div class="eyebrow">Step 9 · if enabled</div>
+          <h2>Azure DevOps Service Hook setup</h2>
+          <p class="footer-note" style="margin-top:0;">Use the secrets, org/project values, and Worker URL from earlier steps. This section wires Azure DevOps to the deployed Worker.</p>
           <div id="azureContent"></div>
         </section>
 
@@ -953,29 +1004,15 @@ npm run deploy</pre>
       githubBackfill: true,
       privateGithub: false,
       azureBackfill: true,
+      workerHost: "",
       keys: {},
     };
 
     const KEY_FIELDS = [
       {
-        key: "TICKTICK_CLIENT_ID",
-        group: "always",
-        kind: "secret",
-        hint: "OAuth client ID for TickTick API access.",
-        where: "Create an app at https://developer.ticktick.com/ → open the app → copy Client ID. In the app’s OAuth redirect / callback settings, register both URLs exactly:<br />• Local: <code>http://localhost:8787/auth/ticktick/callback</code><br />• Production: <code>https://&lt;your-worker&gt;.workers.dev/auth/ticktick/callback</code><br />Replace <code>&lt;your-worker&gt;</code> with your Cloudflare Workers subdomain (or custom domain). Mismatched scheme/host/path causes OAuth redirect errors.",
-        placeholder: "your_ticktick_client_id",
-      },
-      {
-        key: "TICKTICK_CLIENT_SECRET",
-        group: "always",
-        kind: "secret",
-        hint: "OAuth client secret for TickTick API access.",
-        where: "Same TickTick developer app as Client ID → copy Client Secret. Keep it private. Callback URLs (must already be registered on that app): <code>http://localhost:8787/auth/ticktick/callback</code> and <code>https://&lt;your-worker&gt;.workers.dev/auth/ticktick/callback</code>.",
-        placeholder: "your_ticktick_client_secret",
-      },
-      {
         key: "DEBUG_TOKEN",
         group: "always",
+        phase: "invent",
         kind: "secret",
         generatable: true,
         hint: "Bearer token that protects debug and backfill endpoints.",
@@ -985,6 +1022,7 @@ npm run deploy</pre>
       {
         key: "GITHUB_WEBHOOK_SECRET",
         group: "github",
+        phase: "invent",
         kind: "secret",
         generatable: true,
         hint: "Shared secret used to verify GitHub webhook deliveries.",
@@ -992,40 +1030,9 @@ npm run deploy</pre>
         placeholder: "your_github_webhook_secret",
       },
       {
-        key: "GITHUB_TOKEN",
-        group: "github",
-        kind: "secret",
-        hint: "Optional unless you need private-repo backfill or higher API rate limits.",
-        where: "GitHub → Settings → Developer settings → Personal access tokens → generate a classic or fine-grained token with access to the target repositories. Skip if you only sync public repos via webhooks.",
-        placeholder: "optional_github_token",
-      },
-      {
-        key: "GITHUB_TICKTICK_PROJECT_ID",
-        group: "github",
-        kind: "var",
-        hint: "TickTick list ID that should receive GitHub issues.",
-        where: "After TickTick OAuth, call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for GitHub.",
-        placeholder: "YOUR_GITHUB_TICKTICK_LIST_ID",
-      },
-      {
-        key: "GITHUB_LOGIN",
-        group: "github",
-        kind: "var",
-        hint: "Informational GitHub username shown in config / docs.",
-        where: "Your GitHub profile username (the handle in github.com/&lt;username&gt;). Not a secret.",
-        placeholder: "your-github-username",
-      },
-      {
-        key: "AZURE_DEVOPS_PAT",
-        group: "azure",
-        kind: "secret",
-        hint: "Personal access token used to read work items / Taskboard data.",
-        where: "Azure DevOps → User settings (top-right) → Personal access tokens → New Token. Scope at least <code>Work Items → Read</code>. Copy the token once when it is shown.",
-        placeholder: "your_azure_devops_pat",
-      },
-      {
         key: "AZURE_DEVOPS_WEBHOOK_USERNAME",
         group: "azure",
+        phase: "invent",
         kind: "secret",
         hint: "Basic-auth username Azure DevOps Service Hooks will send.",
         where: "Invent any username (e.g. <code>ticktick-sync</code>). Use the same value in Azure DevOps → Project settings → Service hooks → Web Hooks → Basic authentication username.",
@@ -1034,6 +1041,7 @@ npm run deploy</pre>
       {
         key: "AZURE_DEVOPS_WEBHOOK_SECRET",
         group: "azure",
+        phase: "invent",
         kind: "secret",
         generatable: true,
         hint: "Basic-auth password Azure DevOps Service Hooks will send.",
@@ -1041,16 +1049,60 @@ npm run deploy</pre>
         placeholder: "your_azure_devops_webhook_secret",
       },
       {
-        key: "AZURE_DEVOPS_TICKTICK_PROJECT_ID",
-        group: "azure",
+        key: "TICKTICK_CLIENT_ID",
+        group: "always",
+        phase: "ticktick",
+        kind: "secret",
+        hint: "OAuth client ID for TickTick API access.",
+        where: () =>
+          `Create an app at https://developer.ticktick.com/ → open the app → copy Client ID. Register both callback URLs exactly:<br />• Local: <code>${escapeHtml(localCallbackUrl())}</code><br />• Production: <code>${escapeHtml(productionCallbackUrl())}</code><br />${
+            normalizeWorkerHost(state.workerHost)
+              ? ""
+              : "Fill in your Worker hostname in Step 2 so the production URL is concrete.<br />"
+          }Mismatched scheme/host/path causes OAuth redirect errors.`,
+        placeholder: "your_ticktick_client_id",
+      },
+      {
+        key: "TICKTICK_CLIENT_SECRET",
+        group: "always",
+        phase: "ticktick",
+        kind: "secret",
+        hint: "OAuth client secret for TickTick API access.",
+        where: () =>
+          `Same TickTick developer app as Client ID → copy Client Secret. Keep it private. Callbacks that must already be registered:<br />• <code>${escapeHtml(localCallbackUrl())}</code><br />• <code>${escapeHtml(productionCallbackUrl())}</code>`,
+        placeholder: "your_ticktick_client_secret",
+      },
+      {
+        key: "GITHUB_TOKEN",
+        group: "github",
+        phase: "source",
+        kind: "secret",
+        hint: "Optional unless you need private-repo backfill or higher API rate limits.",
+        where: "GitHub → Settings → Developer settings → Personal access tokens → generate a classic or fine-grained token with access to the target repositories. Skip if you only sync public repos via webhooks.",
+        placeholder: "optional_github_token",
+      },
+      {
+        key: "GITHUB_LOGIN",
+        group: "github",
+        phase: "source",
         kind: "var",
-        hint: "TickTick list ID that should receive Azure DevOps items.",
-        where: "After TickTick OAuth, call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for Azure DevOps.",
-        placeholder: "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID",
+        hint: "Informational GitHub username shown in config / docs.",
+        where: "Your GitHub profile username (the handle in github.com/&lt;username&gt;). Not a secret.",
+        placeholder: "your-github-username",
+      },
+      {
+        key: "AZURE_DEVOPS_PAT",
+        group: "azure",
+        phase: "source",
+        kind: "secret",
+        hint: "Personal access token used to read work items / Taskboard data.",
+        where: "Azure DevOps → User settings (top-right) → Personal access tokens → New Token. Scope at least <code>Work Items → Read</code>. Copy the token once when it is shown.",
+        placeholder: "your_azure_devops_pat",
       },
       {
         key: "AZURE_DEVOPS_ORG",
         group: "azure",
+        phase: "source",
         kind: "var",
         hint: "Azure DevOps organization name.",
         where: "From your board URL: <code>https://dev.azure.com/&lt;ORG&gt;/&lt;PROJECT&gt;/_boards/...</code> — the <code>&lt;ORG&gt;</code> segment.",
@@ -1059,6 +1111,7 @@ npm run deploy</pre>
       {
         key: "AZURE_DEVOPS_PROJECT",
         group: "azure",
+        phase: "source",
         kind: "var",
         hint: "Azure DevOps project name.",
         where: "From the same board URL — the <code>&lt;PROJECT&gt;</code> segment after the org.",
@@ -1067,6 +1120,7 @@ npm run deploy</pre>
       {
         key: "AZURE_DEVOPS_TEAM",
         group: "azure",
+        phase: "source",
         kind: "var",
         hint: "Team name for Taskboard / sprint backfill (optional for Kanban open-workitems).",
         where: "From the board URL team segment, or Azure DevOps → Project settings → Teams. If omitted, the Worker falls back to the project name.",
@@ -1075,10 +1129,29 @@ npm run deploy</pre>
       {
         key: "AZURE_DEVOPS_WORK_ITEM_TYPES",
         group: "azure",
+        phase: "source",
         kind: "var",
         hint: "Comma-separated work item types to sync. Closed/Done are always skipped.",
         where: "Match the types on your board process (Agile/Scrum/Basic). Default works for most boards: <code>Bug,Task,User Story,Product Backlog Item,Issue</code>. Edit only if your process uses different type names.",
         placeholder: "Bug,Task,User Story,Product Backlog Item,Issue",
+      },
+      {
+        key: "GITHUB_TICKTICK_PROJECT_ID",
+        group: "github",
+        phase: "lists",
+        kind: "var",
+        hint: "TickTick list ID that should receive GitHub issues.",
+        where: "From Step 6: call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for GitHub.",
+        placeholder: "YOUR_GITHUB_TICKTICK_LIST_ID",
+      },
+      {
+        key: "AZURE_DEVOPS_TICKTICK_PROJECT_ID",
+        group: "azure",
+        phase: "lists",
+        kind: "var",
+        hint: "TickTick list ID that should receive Azure DevOps items.",
+        where: "From Step 6: call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for Azure DevOps.",
+        placeholder: "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID",
       },
     ];
 
@@ -1091,13 +1164,23 @@ npm run deploy</pre>
       privateGithub: document.getElementById("privateGithub"),
       azureBackfillGroup: document.getElementById("azureBackfillGroup"),
       azureBackfill: document.getElementById("azureBackfill"),
+      workerHost: document.getElementById("workerHost"),
+      workerHostPreview: document.getElementById("workerHostPreview"),
+      ticktickCallbackCallout: document.getElementById("ticktickCallbackCallout"),
+      prodOauthSteps: document.getElementById("prodOauthSteps"),
+      keysSourcesSection: document.getElementById("keys-sources"),
+      keysListsSection: document.getElementById("keys-lists"),
       enabledCount: document.getElementById("enabledCount"),
       secretCount: document.getElementById("secretCount"),
       varCount: document.getElementById("varCount"),
       sourceWarning: document.getElementById("sourceWarning"),
       planSummary: document.getElementById("planSummary"),
-      credentialTables: document.getElementById("credentialTables"),
-      keysForm: document.getElementById("keysForm"),
+      keyForms: {
+        invent: document.getElementById("keysInventForm"),
+        ticktick: document.getElementById("keysTicktickForm"),
+        source: document.getElementById("keysSourcesForm"),
+        lists: document.getElementById("keysListsForm"),
+      },
       devVars: document.getElementById("dev-vars"),
       varsSnippet: document.getElementById("vars-snippet"),
       secretCommands: document.getElementById("secret-commands"),
@@ -1112,6 +1195,41 @@ npm run deploy</pre>
       printSheet: document.getElementById("printSheet"),
     };
 
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function normalizeWorkerHost(value) {
+      return String(value || "")
+        .trim()
+        .replace(/^https?:\/\//i, "")
+        .replace(/\/.*$/, "");
+    }
+
+    function localCallbackUrl() {
+      return "http://localhost:8787/auth/ticktick/callback";
+    }
+
+    function productionBaseUrl() {
+      const host = normalizeWorkerHost(state.workerHost);
+      return host ? `https://${host}` : "https://<your-worker>.workers.dev";
+    }
+
+    function productionCallbackUrl() {
+      return `${productionBaseUrl()}/auth/ticktick/callback`;
+    }
+
+    function productionStartUrl() {
+      return `${productionBaseUrl()}/auth/ticktick/start`;
+    }
+
+    function fieldWhereHtml(field) {
+      return typeof field.where === "function" ? field.where() : field.where;
+    }
+
     function keyValue(key, fallback = "") {
       const value = state.keys[key];
       return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -1121,8 +1239,9 @@ npm run deploy</pre>
       return keyValue(key, placeholder);
     }
 
-    function visibleKeyFields() {
+    function visibleKeyFields(phase) {
       return KEY_FIELDS.filter((field) => {
+        if (phase && field.phase !== phase) return false;
         if (field.group === "always") return true;
         if (field.group === "github") return state.useGithub;
         if (field.group === "azure") return state.useAzure;
@@ -1147,6 +1266,7 @@ npm run deploy</pre>
     }
 
     function refreshKeyDependentSections() {
+      renderCloudflareHints();
       renderDevVars();
       renderVarsSnippet();
       renderSecretCommands();
@@ -1155,9 +1275,16 @@ npm run deploy</pre>
       bindCopies();
     }
 
-    function renderKeysForm() {
-      const fields = visibleKeyFields();
-      els.keysForm.innerHTML = fields
+    function renderKeyPhase(phase) {
+      const form = els.keyForms[phase];
+      if (!form) return;
+      const fields = visibleKeyFields(phase);
+      if (fields.length === 0) {
+        form.innerHTML = `<div class="callout warning"><strong>Nothing required here</strong> No ${phase} keys are needed for your current source selection.</div>`;
+        return;
+      }
+
+      form.innerHTML = fields
         .map((field) => {
           const generateBtn = field.generatable
             ? `<button class="generate-secret-btn" type="button" data-generate-for="${field.key}" title="Browser-generated; prefer openssl rand -hex 32 when possible">Generate</button>`
@@ -1171,7 +1298,7 @@ npm run deploy</pre>
           <div class="hint">${field.hint}</div>
           <details class="where">
             <summary>Where to get / generate it</summary>
-            <div class="where-body">${field.where}</div>
+            <div class="where-body">${fieldWhereHtml(field)}</div>
           </details>
           <div class="key-field-controls">
             <input
@@ -1190,7 +1317,7 @@ npm run deploy</pre>
         })
         .join("");
 
-      els.keysForm.querySelectorAll("input[data-key-name]").forEach((input) => {
+      form.querySelectorAll("input[data-key-name]").forEach((input) => {
         input.addEventListener("input", () => {
           const keyName = input.getAttribute("data-key-name");
           if (!keyName) return;
@@ -1199,11 +1326,11 @@ npm run deploy</pre>
         });
       });
 
-      els.keysForm.querySelectorAll("[data-generate-for]").forEach((button) => {
+      form.querySelectorAll("[data-generate-for]").forEach((button) => {
         button.addEventListener("click", () => {
           const keyName = button.getAttribute("data-generate-for");
           if (!keyName) return;
-          const input = els.keysForm.querySelector(`#key-${CSS.escape(keyName)}`);
+          const input = form.querySelector(`#key-${CSS.escape(keyName)}`);
           const value = generateBrowserSecret(32);
           state.keys[keyName] = value;
           if (input) {
@@ -1216,11 +1343,34 @@ npm run deploy</pre>
       });
     }
 
-    function escapeHtml(value) {
-      return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;");
+    function renderKeysForm() {
+      Object.keys(els.keyForms).forEach((phase) => renderKeyPhase(phase));
+      const hasSourceKeys = visibleKeyFields("source").length > 0;
+      const hasListKeys = visibleKeyFields("lists").length > 0;
+      els.keysSourcesSection.classList.toggle("hidden", !hasSourceKeys);
+      els.keysListsSection.classList.toggle("hidden", !hasListKeys);
+    }
+
+    function renderCloudflareHints() {
+      const host = normalizeWorkerHost(state.workerHost);
+      els.workerHostPreview.innerHTML = host
+        ? `Production callback will be <code>${escapeHtml(productionCallbackUrl())}</code>`
+        : "Enter a hostname to lock in the production TickTick callback URL used in Step 4.";
+      els.ticktickCallbackCallout.innerHTML = `
+        <strong>Register these exact OAuth callback URLs</strong>
+        <p style="margin:8px 0 0;">Local: <code>${escapeHtml(localCallbackUrl())}</code></p>
+        <p style="margin:6px 0 0;">Production: <code>${escapeHtml(productionCallbackUrl())}</code></p>
+        ${
+          host
+            ? ""
+            : "<p style=\"margin:8px 0 0;\">Set your Worker hostname in Step 2 if you have not already — otherwise replace <code>&lt;your-worker&gt;.workers.dev</code> when registering TickTick.</p>"
+        }
+      `;
+      els.prodOauthSteps.innerHTML = `
+        <li>Confirm <code>${escapeHtml(productionCallbackUrl())}</code> is registered in the TickTick app.</li>
+        <li>Open <code>${escapeHtml(productionStartUrl())}</code>.</li>
+        <li>Verify with <code>${escapeHtml(productionBaseUrl())}/debug/projects</code> using your <code>DEBUG_TOKEN</code>.</li>
+      `;
     }
 
     function codeBlock(id, code) {
@@ -1236,61 +1386,16 @@ npm run deploy</pre>
       return `<li><strong>${title}</strong><span class="muted">${body}</span></li>`;
     }
 
-    function renderCredentialTables() {
-      const sections = [];
-
-      sections.push(`
-        <h3 style="margin-top:20px;">Always required</h3>
-        <table>
-          <thead><tr><th>Name</th><th>Type</th><th>Used for</th><th>Where to get it</th></tr></thead>
-          <tbody>
-            <tr><td><code>TICKTICK_CLIENT_ID</code></td><td>Secret</td><td>TickTick OAuth</td><td>TickTick Developer app; register callbacks <code>http://localhost:8787/auth/ticktick/callback</code> and <code>https://&lt;worker&gt;.workers.dev/auth/ticktick/callback</code></td></tr>
-            <tr><td><code>TICKTICK_CLIENT_SECRET</code></td><td>Secret</td><td>TickTick OAuth</td><td>Same TickTick Developer app as Client ID</td></tr>
-            <tr><td><code>DEBUG_TOKEN</code></td><td>Secret</td><td>Protecting debug and backfill endpoints</td><td>Use <em>Generate</em> on this page, or prefer <code>openssl rand -hex 32</code></td></tr>
-          </tbody>
-        </table>
-      `);
-
-      if (state.useGithub) {
-        sections.push(`
-          <h3 style="margin-top:20px;">GitHub only</h3>
-          <table>
-            <thead><tr><th>Name</th><th>Type</th><th>Used for</th><th>Where to get it</th></tr></thead>
-            <tbody>
-              <tr><td><code>GITHUB_WEBHOOK_SECRET</code></td><td>Secret</td><td>Verifying GitHub webhooks</td><td>Create your own random secret; use the same value in the GitHub webhook UI</td></tr>
-              <tr><td><code>GITHUB_TICKTICK_PROJECT_ID</code></td><td>Var</td><td>TickTick list for GitHub issues</td><td>Use <code>/debug/projects</code> after TickTick OAuth</td></tr>
-              <tr><td><code>GITHUB_LOGIN</code></td><td>Var</td><td>Informational only</td><td>Your GitHub username</td></tr>
-              <tr><td><code>GITHUB_TOKEN</code></td><td>Secret</td><td>${state.privateGithub ? "Private-repo backfill and rate limits" : "Optional private-repo backfill / higher rate limits"}</td><td>GitHub personal access token settings</td></tr>
-            </tbody>
-          </table>
-        `);
-      }
-
-      if (state.useAzure) {
-        sections.push(`
-          <h3 style="margin-top:20px;">Azure DevOps only</h3>
-          <table>
-            <thead><tr><th>Name</th><th>Type</th><th>Used for</th><th>Where to get it</th></tr></thead>
-            <tbody>
-              <tr><td><code>AZURE_DEVOPS_PAT</code></td><td>Secret</td><td>Reading work items and Taskboard data</td><td>Azure DevOps → User settings → Personal access tokens; scope: Work Items Read</td></tr>
-              <tr><td><code>AZURE_DEVOPS_WEBHOOK_USERNAME</code></td><td>Secret</td><td>Service Hook basic auth username</td><td>Choose your own value, e.g. <code>ticktick-sync</code></td></tr>
-              <tr><td><code>AZURE_DEVOPS_WEBHOOK_SECRET</code></td><td>Secret</td><td>Service Hook basic auth password</td><td>Create your own random secret; use the same value in Azure DevOps Service Hooks</td></tr>
-              <tr><td><code>AZURE_DEVOPS_TICKTICK_PROJECT_ID</code></td><td>Var</td><td>TickTick list for Azure DevOps items</td><td>Use <code>/debug/projects</code> after TickTick OAuth</td></tr>
-              <tr><td><code>AZURE_DEVOPS_ORG</code></td><td>Var</td><td>Azure DevOps organization</td><td>From the <code>dev.azure.com/&lt;org&gt;</code> URL segment</td></tr>
-              <tr><td><code>AZURE_DEVOPS_PROJECT</code></td><td>Var</td><td>Azure DevOps project</td><td>From the board/project URL</td></tr>
-              <tr><td><code>AZURE_DEVOPS_TEAM</code></td><td>Var</td><td>Team (Taskboard / sprint); optional for Kanban open-workitems</td><td>From the board URL; defaults to project name</td></tr>
-              <tr><td><code>AZURE_DEVOPS_WORK_ITEM_TYPES</code></td><td>Var</td><td>Work item types to sync</td><td>Default: Bug,Task,User Story,Product Backlog Item,Issue</td></tr>
-            </tbody>
-          </table>
-        `);
-      }
-
-      els.credentialTables.innerHTML = sections.join("");
-    }
-
     function renderPlanSummary() {
       const items = [];
-      items.push(listItem("TickTick OAuth", "Always required for any setup."));
+      items.push(listItem("Order", "Cloudflare URL → invent secrets → TickTick app → sources → local → list IDs → deploy."));
+      items.push(
+        listItem(
+          "Worker hostname",
+          normalizeWorkerHost(state.workerHost) || "Not set yet — set in Step 2 before TickTick registration.",
+        ),
+      );
+      items.push(listItem("TickTick OAuth", "Create the developer app after Cloudflare so callbacks are known."));
       if (state.useGithub) {
         const githubBackfillNote = state.githubBackfill
           ? state.privateGithub
@@ -1443,7 +1548,7 @@ npm run deploy</pre>
           </li>
           <li>
             <strong>Configure the webhook</strong>
-            ${codeBlock("github-webhook", `Payload URL: https://<your-worker>.workers.dev/webhooks/github
+            ${codeBlock("github-webhook", `Payload URL: ${productionBaseUrl()}/webhooks/github
 Content type: application/json
 Secret: GITHUB_WEBHOOK_SECRET
 Events: Issues only`)}
@@ -1454,7 +1559,7 @@ Events: Issues only`)}
             <strong>Backfill existing open issues</strong>
             ${codeBlock("github-backfill", `curl -X POST \\
   -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
-  "https://<your-worker>.workers.dev/sync/github/open-issues?repo=OWNER/REPO"`)}
+  "${productionBaseUrl()}/sync/github/open-issues?repo=OWNER/REPO"`)}
           </li>`
               : `<li>
             <strong>Backfill skipped</strong>
@@ -1514,7 +1619,7 @@ Create subscriptions for:
 - workitem.deleted
 - workitem.restored
 
-URL: https://<your-worker>.workers.dev/webhooks/azure-devops
+URL: ${productionBaseUrl()}/webhooks/azure-devops
 Basic auth username: AZURE_DEVOPS_WEBHOOK_USERNAME
 Basic auth password: AZURE_DEVOPS_WEBHOOK_SECRET
 Resource details to send: All`)}
@@ -1526,13 +1631,13 @@ Resource details to send: All`)}
             <p>Use this for Kanban / backlog boards. Items already in the <strong>Closed</strong> column (or Done / Removed / Completed) are intentionally excluded.</p>
             ${codeBlock("azure-backfill-open", `curl -X POST \\
   -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
-  "https://<your-worker>.workers.dev/sync/azure-devops/open-workitems"`)}
+  "${productionBaseUrl()}/sync/azure-devops/open-workitems"`)}
           </li>
           <li>
             <strong>Optional: current-sprint Taskboard only</strong>
             ${codeBlock("azure-backfill-taskboard", `curl -X POST \\
   -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
-  "https://<your-worker>.workers.dev/sync/azure-devops/taskboard"`)}
+  "${productionBaseUrl()}/sync/azure-devops/taskboard"`)}
           </li>`
               : `<li>
             <strong>Backfill skipped</strong>
@@ -1587,23 +1692,24 @@ Resource details to send: All`)}
     function buildVerifyCommands() {
       const debugToken = keyOrPlaceholder("DEBUG_TOKEN", "$DEBUG_TOKEN");
       const authHeader = `Authorization: Bearer ${debugToken}`;
+      const base = productionBaseUrl();
       const lines = [
-        "curl https://<worker>/health",
-        `curl -H "${authHeader}" https://<worker>/debug/projects`,
+        `curl ${base}/health`,
+        `curl -H "${authHeader}" ${base}/debug/projects`,
       ];
       if (state.useGithub && state.githubBackfill) {
         lines.push("");
         lines.push("# GitHub backfill");
         lines.push(`curl -X POST -H "${authHeader}" \\`);
-        lines.push('  "https://<worker>/sync/github/open-issues?repo=OWNER/REPO"');
+        lines.push(`  "${base}/sync/github/open-issues?repo=OWNER/REPO"`);
       }
       if (state.useAzure && state.azureBackfill) {
         lines.push("");
         lines.push("# Azure DevOps backfill (skips Closed / Done / Removed / Completed)");
         lines.push(`curl -X POST -H "${authHeader}" \\`);
-        lines.push('  "https://<worker>/sync/azure-devops/open-workitems"');
+        lines.push(`  "${base}/sync/azure-devops/open-workitems"`);
         lines.push(`curl -X POST -H "${authHeader}" \\`);
-        lines.push('  "https://<worker>/sync/azure-devops/taskboard"');
+        lines.push(`  "${base}/sync/azure-devops/taskboard"`);
       }
       return lines.join("\n");
     }
@@ -1624,6 +1730,7 @@ Resource details to send: All`)}
           githubBackfill: state.githubBackfill,
           privateGithub: state.privateGithub,
           azureBackfill: state.azureBackfill,
+          workerHost: normalizeWorkerHost(state.workerHost),
         },
         keys,
         generated: {
@@ -1632,10 +1739,13 @@ Resource details to send: All`)}
           wranglerSecretCommands: els.secretCommands.textContent || "",
           verifyCommands: buildVerifyCommands(),
           listGuidance: els.listGuidance.textContent || "",
+          localCallbackUrl: localCallbackUrl(),
+          productionCallbackUrl: productionCallbackUrl(),
         },
         notes: [
           "This export may contain live secret values if you filled in the key fields.",
           "Complete TickTick OAuth in both local and production because local and remote D1 databases are separate.",
+          "Create the Cloudflare Worker hostname before registering TickTick callback URLs.",
         ],
       };
     }
@@ -1687,6 +1797,9 @@ Resource details to send: All`)}
   <div class="card">
     <strong>What you chose</strong>
     <ul>
+      <li>Worker hostname: ${escapeHtml(normalizeWorkerHost(state.workerHost) || "(not set)")}</li>
+      <li>Local TickTick callback: <code>${escapeHtml(localCallbackUrl())}</code></li>
+      <li>Production TickTick callback: <code>${escapeHtml(productionCallbackUrl())}</code></li>
       <li>GitHub sync: ${state.useGithub ? "enabled" : "disabled"}</li>
       <li>GitHub backfill: ${state.useGithub ? (state.githubBackfill ? "enabled" : "disabled") : "n/a"}</li>
       <li>Private GitHub backfill PAT needed: ${state.useGithub && state.githubBackfill && state.privateGithub ? "yes" : "no"}</li>
@@ -1722,10 +1835,12 @@ Resource details to send: All`)}
   <h2>Rebuild checklist</h2>
   <div class="card">
     <ol>
+      <li>Cloudflare login + D1; note the Worker hostname and register TickTick callbacks.</li>
+      <li>Invent secrets, create the TickTick developer app, then gather source credentials.</li>
       <li>Install dependencies and create <code>.dev.vars</code> from the values above.</li>
       <li>Put the vars snippet into <code>wrangler.jsonc</code>.</li>
       <li>Run <code>npm run db:migrate:local</code>, <code>npm run cf-typegen</code>, and <code>npm run dev</code>.</li>
-      <li>Complete TickTick OAuth and confirm the TickTick list ID(s).</li>
+      <li>Complete local TickTick OAuth, then fill list ID vars from <code>/debug/projects</code>.</li>
       <li>Deploy with remote migrations + the Wrangler secret commands above.</li>
       <li>Complete production TickTick OAuth, then configure only the enabled source webhooks.</li>
       <li>Run the verification commands for the enabled sources.</li>
@@ -1781,6 +1896,7 @@ Resource details to send: All`)}
         typeof selections.azureBackfill === "boolean"
           ? selections.azureBackfill
           : state.useAzure;
+      state.workerHost = normalizeWorkerHost(selections.workerHost || "");
 
       const importedKeys =
         payload.keys && typeof payload.keys === "object" ? payload.keys : {};
@@ -1798,6 +1914,7 @@ Resource details to send: All`)}
       els.githubBackfill.checked = state.githubBackfill;
       els.privateGithub.checked = state.privateGithub;
       els.azureBackfill.checked = state.azureBackfill;
+      els.workerHost.value = state.workerHost;
       render();
     }
 
@@ -1878,7 +1995,7 @@ Resource details to send: All`)}
     function render() {
       updateCounts();
       renderPlanSummary();
-      renderCredentialTables();
+      renderCloudflareHints();
       renderKeysForm();
       renderDevVars();
       renderVarsSnippet();
@@ -1897,6 +2014,7 @@ Resource details to send: All`)}
       state.githubBackfill = els.githubBackfill.checked;
       state.privateGithub = els.privateGithub.checked && state.githubBackfill;
       state.azureBackfill = els.azureBackfill.checked;
+      state.workerHost = els.workerHost.value;
       if (!state.githubBackfill && els.privateGithub.checked) {
         els.privateGithub.checked = false;
       }
@@ -1905,6 +2023,22 @@ Resource details to send: All`)}
 
     [els.useGithub, els.useAzure, els.sharedList, els.githubBackfill, els.privateGithub, els.azureBackfill].forEach((input) => {
       input.addEventListener("change", syncState);
+    });
+
+    els.workerHost.addEventListener("input", () => {
+      state.workerHost = els.workerHost.value;
+      refreshKeyDependentSections();
+      // Re-render TickTick where guidance so callback URLs stay current.
+      renderKeyPhase("ticktick");
+      renderPlanSummary();
+    });
+
+    els.workerHost.addEventListener("blur", () => {
+      state.workerHost = normalizeWorkerHost(els.workerHost.value);
+      els.workerHost.value = state.workerHost;
+      refreshKeyDependentSections();
+      renderKeyPhase("ticktick");
+      renderPlanSummary();
     });
 
     els.exportJsonBtn.addEventListener("click", () => {
