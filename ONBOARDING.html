@@ -265,45 +265,6 @@
       outline-offset: 1px;
     }
 
-    .waifu-corner {
-      position: fixed;
-      right: 10px;
-      bottom: 8px;
-      z-index: 4;
-      width: min(168px, 28vw);
-      pointer-events: none;
-      filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
-      opacity: 0.92;
-    }
-
-    .waifu-corner img {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-
-    .waifu-credit {
-      position: fixed;
-      right: 14px;
-      bottom: 4px;
-      z-index: 4;
-      font-size: 10px;
-      color: var(--muted);
-      background: color-mix(in srgb, var(--panel-strong) 82%, transparent);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 2px 8px;
-      text-decoration: none;
-      pointer-events: auto;
-    }
-
-    .waifu-credit:hover { text-decoration: underline; }
-
-    body.printing-recreation .waifu-corner,
-    body.printing-recreation .waifu-credit {
-      display: none !important;
-    }
-
     .button-row {
       display: flex;
       gap: 12px;
@@ -838,7 +799,7 @@ npm run deploy</pre>
           </div>
           <p class="import-status" id="importStatus" aria-live="polite"></p>
           <p class="footer-note">
-            Exports include your selected sources, routing mode, generated env templates, secret commands, and verification commands. Secret placeholders are exported, not real secret values.
+            Exports include your selected sources, routing mode, any keys you entered, generated env templates, secret commands, and verification commands.
           </p>
         </section>
 
@@ -1403,7 +1364,7 @@ Resource details to send: All`)}
           <li>
             <strong>Backfill current sprint Taskboard items</strong>
             ${codeBlock("azure-backfill", `curl -X POST \\
-  -H "Authorization: Bearer YOUR_DEBUG_TOKEN" \\
+  -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
   "https://<your-worker>.workers.dev/sync/azure-devops/taskboard"`)}
           </li>
           <li>
@@ -1670,6 +1631,12 @@ Resource details to send: All`)}
         els.listGuidance.textContent = "Copy the Azure DevOps destination list ID into AZURE_DEVOPS_TICKTICK_PROJECT_ID.";
       } else {
         els.listGuidance.textContent = "Once you enable a source, copy its destination TickTick list ID into the matching variable.";
+      }
+
+      const debugProjects = document.getElementById("debug-projects");
+      if (debugProjects) {
+        debugProjects.textContent = `curl -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
+  http://localhost:8787/debug/projects`;
       }
     }
 
