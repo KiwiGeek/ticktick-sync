@@ -365,7 +365,9 @@
     }
 
     .nav-list a {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 10px;
       padding: 10px 12px;
       border-radius: 14px;
       color: var(--text);
@@ -376,6 +378,61 @@
       background: color-mix(in srgb, var(--panel-strong) 78%, transparent);
       border-color: var(--border);
       text-decoration: none;
+    }
+
+    .nav-status {
+      flex: 0 0 auto;
+      width: 1.15rem;
+      height: 1.15rem;
+      display: inline-grid;
+      place-items: center;
+      font-size: 12px;
+      line-height: 1;
+      border-radius: 999px;
+      font-weight: 800;
+    }
+
+    .nav-status-complete {
+      color: color-mix(in srgb, var(--success) 80%, var(--text));
+      background: color-mix(in srgb, var(--success) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--success) 40%, var(--border));
+    }
+
+    .nav-status-incomplete {
+      color: color-mix(in srgb, var(--warning) 85%, var(--text));
+      background: color-mix(in srgb, var(--warning) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--border));
+    }
+
+    .nav-status-pending {
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid color-mix(in srgb, var(--muted) 45%, var(--border));
+    }
+
+    .nav-label {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .nav-legend {
+      display: grid;
+      gap: 6px;
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .nav-legend li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .step-complete-toggle {
+      margin-top: 14px;
     }
 
     .section-stack {
@@ -592,21 +649,12 @@
       <aside class="sidebar">
         <section class="panel">
           <h3>Jump to</h3>
-          <ul class="nav-list">
-            <li><a href="#questionnaire">1. Questionnaire</a></li>
-            <li><a href="#cloudflare">2. Cloudflare + Worker URL</a></li>
-            <li><a href="#keys-invent">3. Invent secrets</a></li>
-            <li><a href="#keys-ticktick">4. TickTick developer app</a></li>
-            <li><a href="#keys-sources">5. Source credentials</a></li>
-            <li><a href="#local">6. Local Worker</a></li>
-            <li><a href="#keys-lists">7. TickTick list IDs</a></li>
-            <li><a href="#deploy">8. Production deploy</a></li>
-            <li><a href="#github">GitHub setup</a></li>
-            <li><a href="#azure">Azure DevOps setup</a></li>
-            <li><a href="#verify">Verification</a></li>
-            <li><a href="#export">Export</a></li>
-            <li><a href="#troubleshooting">Troubleshooting</a></li>
+          <ul class="nav-legend" aria-label="Section status legend">
+            <li><span class="nav-status nav-status-complete" aria-hidden="true">✓</span> Complete</li>
+            <li><span class="nav-status nav-status-incomplete" aria-hidden="true">◐</span> Incomplete</li>
+            <li><span class="nav-status nav-status-pending" aria-hidden="true">○</span> Not started</li>
           </ul>
+          <ul class="nav-list" id="navList"></ul>
         </section>
         <section class="panel">
           <h3>Your plan</h3>
@@ -875,6 +923,13 @@ curl http://localhost:8787/health</pre>
               <p id="list-guidance" class="footer-note"></p>
             </li>
           </div>
+          <label class="toggle step-complete-toggle">
+            <input id="doneLocal" type="checkbox" />
+            <span>
+              <strong>Mark Step 6 complete</strong>
+              Check this after local install, OAuth, and <code>/debug/projects</code> work.
+            </span>
+          </label>
         </section>
 
         <section class="panel" id="keys-lists">
@@ -913,6 +968,13 @@ npm run deploy</pre>
               <ul class="compact-list" id="prodOauthSteps"></ul>
             </li>
           </div>
+          <label class="toggle step-complete-toggle">
+            <input id="doneDeploy" type="checkbox" />
+            <span>
+              <strong>Mark Step 8 complete</strong>
+              Check this after remote migrate, deploy, and production TickTick OAuth succeed.
+            </span>
+          </label>
         </section>
 
         <section class="panel" id="github">
@@ -920,6 +982,13 @@ npm run deploy</pre>
           <h2>GitHub webhook setup</h2>
           <p class="footer-note" style="margin-top:0;">Use the secrets and Worker URL from earlier steps. This section is only about wiring GitHub to the deployed Worker.</p>
           <div id="githubContent"></div>
+          <label class="toggle step-complete-toggle" id="doneGithubWrap">
+            <input id="doneGithub" type="checkbox" />
+            <span>
+              <strong>Mark GitHub setup complete</strong>
+              Check this after the webhook is configured and optional backfill has been run.
+            </span>
+          </label>
         </section>
 
         <section class="panel" id="azure">
@@ -927,6 +996,13 @@ npm run deploy</pre>
           <h2>Azure DevOps Service Hook setup</h2>
           <p class="footer-note" style="margin-top:0;">Use the secrets, org/project values, and Worker URL from earlier steps. This section wires Azure DevOps to the deployed Worker.</p>
           <div id="azureContent"></div>
+          <label class="toggle step-complete-toggle" id="doneAzureWrap">
+            <input id="doneAzure" type="checkbox" />
+            <span>
+              <strong>Mark Azure DevOps setup complete</strong>
+              Check this after Service Hooks are configured and optional backfill has been run.
+            </span>
+          </label>
         </section>
 
         <section class="panel" id="verify">
@@ -1024,6 +1100,12 @@ npm run deploy</pre>
       azureBackfill: true,
       workerHost: "",
       keys: {},
+      done: {
+        local: false,
+        deploy: false,
+        github: false,
+        azure: false,
+      },
     };
 
     const KEY_FIELDS = [
@@ -1031,6 +1113,7 @@ npm run deploy</pre>
         key: "DEBUG_TOKEN",
         group: "always",
         phase: "invent",
+        required: true,
         kind: "secret",
         generatable: true,
         hint: "Bearer token that protects debug and backfill endpoints.",
@@ -1041,6 +1124,7 @@ npm run deploy</pre>
         key: "GITHUB_WEBHOOK_SECRET",
         group: "github",
         phase: "invent",
+        required: true,
         kind: "secret",
         generatable: true,
         hint: "Shared secret used to verify GitHub webhook deliveries.",
@@ -1051,6 +1135,7 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_WEBHOOK_USERNAME",
         group: "azure",
         phase: "invent",
+        required: true,
         kind: "secret",
         hint: "Basic-auth username Azure DevOps Service Hooks will send.",
         where: "Invent any username (e.g. <code>ticktick-sync</code>). Use the same value in Azure DevOps → Project settings → Service hooks → Web Hooks → Basic authentication username.",
@@ -1060,6 +1145,7 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_WEBHOOK_SECRET",
         group: "azure",
         phase: "invent",
+        required: true,
         kind: "secret",
         generatable: true,
         hint: "Basic-auth password Azure DevOps Service Hooks will send.",
@@ -1070,6 +1156,7 @@ npm run deploy</pre>
         key: "TICKTICK_CLIENT_ID",
         group: "always",
         phase: "ticktick",
+        required: true,
         kind: "secret",
         hint: "OAuth client ID for TickTick API access.",
         where: () =>
@@ -1084,6 +1171,7 @@ npm run deploy</pre>
         key: "TICKTICK_CLIENT_SECRET",
         group: "always",
         phase: "ticktick",
+        required: true,
         kind: "secret",
         hint: "OAuth client secret for TickTick API access.",
         where: () =>
@@ -1094,6 +1182,7 @@ npm run deploy</pre>
         key: "GITHUB_TOKEN",
         group: "github",
         phase: "source",
+        required: "privateGithub",
         kind: "secret",
         hint: "Optional unless you need private-repo backfill or higher API rate limits.",
         where: "GitHub → Settings → Developer settings → Personal access tokens → generate a classic or fine-grained token with access to the target repositories. Skip if you only sync public repos via webhooks.",
@@ -1103,6 +1192,7 @@ npm run deploy</pre>
         key: "GITHUB_LOGIN",
         group: "github",
         phase: "source",
+        required: true,
         kind: "var",
         hint: "Informational GitHub username shown in config / docs.",
         where: "Your GitHub profile username (the handle in github.com/&lt;username&gt;). Not a secret.",
@@ -1112,6 +1202,7 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_PAT",
         group: "azure",
         phase: "source",
+        required: true,
         kind: "secret",
         hint: "Personal access token used to read work items / Taskboard data.",
         where: "Azure DevOps → User settings (top-right) → Personal access tokens → New Token. Scope at least <code>Work Items → Read</code>. Copy the token once when it is shown.",
@@ -1121,6 +1212,7 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_ORG",
         group: "azure",
         phase: "source",
+        required: true,
         kind: "var",
         hint: "Azure DevOps organization name.",
         where: "From your board URL: <code>https://dev.azure.com/&lt;ORG&gt;/&lt;PROJECT&gt;/_boards/...</code> — the <code>&lt;ORG&gt;</code> segment.",
@@ -1130,6 +1222,7 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_PROJECT",
         group: "azure",
         phase: "source",
+        required: true,
         kind: "var",
         hint: "Azure DevOps project name.",
         where: "From the same board URL — the <code>&lt;PROJECT&gt;</code> segment after the org.",
@@ -1157,6 +1250,7 @@ npm run deploy</pre>
         key: "GITHUB_TICKTICK_PROJECT_ID",
         group: "github",
         phase: "lists",
+        required: true,
         kind: "var",
         hint: "TickTick list ID that should receive GitHub issues.",
         where: "From Step 6: call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for GitHub.",
@@ -1166,6 +1260,7 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_TICKTICK_PROJECT_ID",
         group: "azure",
         phase: "lists",
+        required: true,
         kind: "var",
         hint: "TickTick list ID that should receive Azure DevOps items.",
         where: "From Step 6: call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for Azure DevOps.",
@@ -1188,6 +1283,15 @@ npm run deploy</pre>
       prodOauthSteps: document.getElementById("prodOauthSteps"),
       keysSourcesSection: document.getElementById("keys-sources"),
       keysListsSection: document.getElementById("keys-lists"),
+      githubSection: document.getElementById("github"),
+      azureSection: document.getElementById("azure"),
+      doneLocal: document.getElementById("doneLocal"),
+      doneDeploy: document.getElementById("doneDeploy"),
+      doneGithub: document.getElementById("doneGithub"),
+      doneAzure: document.getElementById("doneAzure"),
+      doneGithubWrap: document.getElementById("doneGithubWrap"),
+      doneAzureWrap: document.getElementById("doneAzureWrap"),
+      navList: document.getElementById("navList"),
       enabledCount: document.getElementById("enabledCount"),
       secretCount: document.getElementById("secretCount"),
       varCount: document.getElementById("varCount"),
@@ -1267,6 +1371,153 @@ npm run deploy</pre>
       });
     }
 
+    function fieldIsRequired(field) {
+      if (field.required === true) return true;
+      if (field.required === "privateGithub") return state.privateGithub;
+      return false;
+    }
+
+    function requiredFieldsForPhase(phase) {
+      return visibleKeyFields(phase).filter((field) => fieldIsRequired(field));
+    }
+
+    function fillStatusForFields(fields) {
+      if (!fields.length) return "none";
+      const filled = fields.filter((field) => Boolean(keyValue(field.key))).length;
+      if (filled === 0) return "pending";
+      if (filled === fields.length) return "complete";
+      return "incomplete";
+    }
+
+    function fillStatusForPhase(phase) {
+      return fillStatusForFields(requiredFieldsForPhase(phase));
+    }
+
+    function manualStatus(done, prereqComplete) {
+      if (done) return "complete";
+      if (!prereqComplete) return "pending";
+      return "incomplete";
+    }
+
+    function sectionStatuses() {
+      const invent = fillStatusForPhase("invent");
+      const ticktick = fillStatusForPhase("ticktick");
+      const source = fillStatusForPhase("source");
+      const lists = fillStatusForPhase("lists");
+      const cloudflare = normalizeWorkerHost(state.workerHost) ? "complete" : "pending";
+      const questionnaire = state.useGithub || state.useAzure ? "complete" : "incomplete";
+      const localPrereq =
+        invent === "complete" &&
+        ticktick === "complete" &&
+        (source === "complete" || source === "none");
+      const local = manualStatus(state.done.local, localPrereq);
+      const listsPrereq = state.done.local;
+      const listsStatus =
+        lists === "none"
+          ? "none"
+          : lists === "complete"
+            ? "complete"
+            : lists === "incomplete"
+              ? "incomplete"
+              : listsPrereq
+                ? "incomplete"
+                : "pending";
+      const deployPrereq =
+        state.done.local && (lists === "complete" || lists === "none");
+      const deploy = manualStatus(state.done.deploy, deployPrereq);
+      const github = state.useGithub
+        ? manualStatus(state.done.github, state.done.deploy)
+        : "none";
+      const azure = state.useAzure
+        ? manualStatus(state.done.azure, state.done.deploy)
+        : "none";
+
+      return {
+        questionnaire,
+        cloudflare,
+        invent,
+        ticktick,
+        source,
+        local,
+        lists: listsStatus,
+        deploy,
+        github,
+        azure,
+        verify: "none",
+        export: "none",
+        troubleshooting: "none",
+      };
+    }
+
+    function navStatusMarkup(status) {
+      if (status === "complete") {
+        return `<span class="nav-status nav-status-complete" aria-label="Complete">✓</span>`;
+      }
+      if (status === "incomplete") {
+        return `<span class="nav-status nav-status-incomplete" aria-label="Incomplete">◐</span>`;
+      }
+      if (status === "pending") {
+        return `<span class="nav-status nav-status-pending" aria-label="Not started">○</span>`;
+      }
+      return "";
+    }
+
+    function renderNavProgress() {
+      const statuses = sectionStatuses();
+      const items = [
+        { id: "questionnaire", label: "1. Questionnaire", status: statuses.questionnaire },
+        { id: "cloudflare", label: "2. Cloudflare + Worker URL", status: statuses.cloudflare },
+        { id: "keys-invent", label: "3. Invent secrets", status: statuses.invent },
+        { id: "keys-ticktick", label: "4. TickTick developer app", status: statuses.ticktick },
+        {
+          id: "keys-sources",
+          label: "5. Source credentials",
+          status: statuses.source,
+          hidden: statuses.source === "none",
+        },
+        { id: "local", label: "6. Local Worker", status: statuses.local },
+        {
+          id: "keys-lists",
+          label: "7. TickTick list IDs",
+          status: statuses.lists,
+          hidden: statuses.lists === "none",
+        },
+        { id: "deploy", label: "8. Production deploy", status: statuses.deploy },
+        {
+          id: "github",
+          label: "GitHub setup",
+          status: statuses.github,
+          hidden: !state.useGithub,
+        },
+        {
+          id: "azure",
+          label: "Azure DevOps setup",
+          status: statuses.azure,
+          hidden: !state.useAzure,
+        },
+        { id: "verify", label: "Verification", status: "none" },
+        { id: "export", label: "Export", status: "none" },
+        { id: "troubleshooting", label: "Troubleshooting", status: "none" },
+      ];
+
+      els.navList.innerHTML = items
+        .filter((item) => !item.hidden)
+        .map((item) => {
+          const status = navStatusMarkup(item.status);
+          return `<li><a href="#${item.id}">${status}<span class="nav-label">${item.label}</span></a></li>`;
+        })
+        .join("");
+
+      els.githubSection.classList.toggle("hidden", !state.useGithub);
+      els.azureSection.classList.toggle("hidden", !state.useAzure);
+      els.doneGithubWrap.classList.toggle("hidden", !state.useGithub);
+      els.doneAzureWrap.classList.toggle("hidden", !state.useAzure);
+      els.doneLocal.checked = state.done.local;
+      els.doneDeploy.checked = state.done.deploy;
+      els.doneGithub.checked = state.done.github;
+      els.doneAzure.checked = state.done.azure;
+    }
+
     function escapeJsonString(value) {
       return JSON.stringify(value).slice(1, -1);
     }
@@ -1290,6 +1541,7 @@ npm run deploy</pre>
       renderSecretCommands();
       renderVerifySection();
       renderListGuidance();
+      renderNavProgress();
       bindCopies();
     }
 
@@ -1743,6 +1995,7 @@ Resource details to send: All`)}
           privateGithub: state.privateGithub,
           azureBackfill: state.azureBackfill,
           workerHost: normalizeWorkerHost(state.workerHost),
+          done: { ...state.done },
         },
         keys,
         generated: {
@@ -1810,6 +2063,7 @@ Resource details to send: All`)}
     <strong>What you chose</strong>
     <ul>
       <li>Worker hostname: ${escapeHtml(normalizeWorkerHost(state.workerHost) || "(not set)")}</li>
+      <li>Marked complete: local=${state.done.local ? "yes" : "no"}, deploy=${state.done.deploy ? "yes" : "no"}, GitHub=${state.done.github ? "yes" : "no"}, Azure=${state.done.azure ? "yes" : "no"}</li>
       <li>Local TickTick callback: <code>${escapeHtml(localCallbackUrl())}</code></li>
       <li>Production TickTick callback: <code>${escapeHtml(productionCallbackUrl())}</code></li>
       <li>GitHub sync: ${state.useGithub ? "enabled" : "disabled"}</li>
@@ -1909,6 +2163,13 @@ Resource details to send: All`)}
           ? selections.azureBackfill
           : state.useAzure;
       state.workerHost = normalizeWorkerHost(selections.workerHost || "");
+      const importedDone = selections.done && typeof selections.done === "object" ? selections.done : {};
+      state.done = {
+        local: Boolean(importedDone.local),
+        deploy: Boolean(importedDone.deploy),
+        github: Boolean(importedDone.github),
+        azure: Boolean(importedDone.azure),
+      };
 
       const importedKeys =
         payload.keys && typeof payload.keys === "object" ? payload.keys : {};
@@ -1927,6 +2188,10 @@ Resource details to send: All`)}
       els.privateGithub.checked = state.privateGithub;
       els.azureBackfill.checked = state.azureBackfill;
       els.workerHost.value = state.workerHost;
+      els.doneLocal.checked = state.done.local;
+      els.doneDeploy.checked = state.done.deploy;
+      els.doneGithub.checked = state.done.github;
+      els.doneAzure.checked = state.done.azure;
       render();
     }
 
@@ -2016,6 +2281,7 @@ Resource details to send: All`)}
       renderAzureSection();
       renderVerifySection();
       renderListGuidance();
+      renderNavProgress();
       bindCopies();
     }
 
@@ -2027,13 +2293,19 @@ Resource details to send: All`)}
       state.privateGithub = els.privateGithub.checked && state.githubBackfill;
       state.azureBackfill = els.azureBackfill.checked;
       state.workerHost = els.workerHost.value;
+      state.done.local = els.doneLocal.checked;
+      state.done.deploy = els.doneDeploy.checked;
+      state.done.github = els.doneGithub.checked;
+      state.done.azure = els.doneAzure.checked;
       if (!state.githubBackfill && els.privateGithub.checked) {
         els.privateGithub.checked = false;
       }
+      if (!state.useGithub) state.done.github = false;
+      if (!state.useAzure) state.done.azure = false;
       render();
     }
 
-    [els.useGithub, els.useAzure, els.sharedList, els.githubBackfill, els.privateGithub, els.azureBackfill].forEach((input) => {
+    [els.useGithub, els.useAzure, els.sharedList, els.githubBackfill, els.privateGithub, els.azureBackfill, els.doneLocal, els.doneDeploy, els.doneGithub, els.doneAzure].forEach((input) => {
       input.addEventListener("change", syncState);
     });
 
