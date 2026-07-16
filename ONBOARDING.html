@@ -212,6 +212,59 @@
     .import-status.ok { color: var(--success); }
     .import-status.error { color: #ef4444; }
 
+    .key-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .key-field {
+      display: grid;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-strong) 72%, transparent);
+    }
+
+    .key-field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .key-field .kind {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .key-field .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .key-field input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+      color: var(--text);
+      padding: 10px 12px;
+      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .key-field input:focus {
+      outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      outline-offset: 1px;
+    }
+
     .waifu-corner {
       position: fixed;
       right: 10px;
@@ -464,6 +517,11 @@
     }
 
     @media print {
+      .waifu-corner,
+      .waifu-credit {
+        display: none !important;
+      }
+
       body.printing-recreation {
         background: white !important;
       }
@@ -504,6 +562,7 @@
           <ul class="nav-list">
             <li><a href="#questionnaire">Questionnaire</a></li>
             <li><a href="#credentials">Credential checklist</a></li>
+            <li><a href="#keys">Enter your keys</a></li>
             <li><a href="#local">Local setup</a></li>
             <li><a href="#deploy">Production deploy</a></li>
             <li><a href="#github">GitHub setup</a></li>
@@ -610,6 +669,21 @@
           </div>
 
           <div id="credentialTables"></div>
+        </section>
+
+        <section class="panel" id="keys">
+          <div class="eyebrow">Step 2b</div>
+          <h2>Enter the keys you generated</h2>
+          <p>
+            Paste the real values here as you create them. The generated
+            <code>.dev.vars</code>, <code>wrangler.jsonc</code> snippet, verification commands,
+            JSON export, and PDF recreation sheet will all use these values.
+          </p>
+          <div class="callout warning">
+            <strong>Treat exports as secret</strong>
+            If you fill these fields, exported JSON/PDF can contain live secrets. Store those files privately.
+          </div>
+          <div class="key-grid" id="keysForm"></div>
         </section>
 
         <section class="panel" id="local">
@@ -745,9 +819,13 @@ npm run deploy</pre>
           <div class="eyebrow">Save it</div>
           <h2>Export or import your recreation configuration</h2>
           <p>
-            Export only what you chose — a compact recreation sheet with the exact sources, list routing, secrets, vars, and commands needed to rebuild this setup later.
-            You can also import a previously saved JSON plan to restore those choices.
+            Export your selected sources plus any keys you entered — enough to recreate the exact configuration later.
+            Import a previously saved JSON plan to restore both the choices and filled-in keys.
           </p>
+          <div class="callout warning">
+            <strong>Secret warning</strong>
+            JSON and PDF exports include any key values you typed into this page. Keep those files private.
+          </div>
           <div class="callout success">
             <strong>Best options</strong>
             Use JSON for a structured snapshot you can reopen later. Use PDF for a short human-readable recreation sheet (not a printout of this whole page).
@@ -816,13 +894,139 @@ npm run deploy</pre>
 
   <div class="print-sheet" id="printSheet" aria-hidden="true"></div>
 
+  <div class="waifu-corner" aria-hidden="true">
+    <img
+      src="https://upload.wikimedia.org/wikipedia/commons/9/98/Magicgirl.svg"
+      alt=""
+      loading="lazy"
+    />
+  </div>
+  <a
+    class="waifu-credit"
+    href="https://commons.wikimedia.org/wiki/File:Magicgirl.svg"
+    target="_blank"
+    rel="noopener noreferrer"
+    title="CC0 public domain anime girl from Open Clip Art Library / Wikimedia Commons"
+  >
+    CC0 waifu
+  </a>
+
   <script>
     const state = {
       useGithub: true,
       useAzure: true,
       sharedList: false,
       privateGithub: false,
+      keys: {},
     };
+
+    const KEY_FIELDS = [
+      {
+        key: "TICKTICK_CLIENT_ID",
+        group: "always",
+        kind: "secret",
+        hint: "From your TickTick developer app.",
+        placeholder: "your_ticktick_client_id",
+      },
+      {
+        key: "TICKTICK_CLIENT_SECRET",
+        group: "always",
+        kind: "secret",
+        hint: "From your TickTick developer app.",
+        placeholder: "your_ticktick_client_secret",
+      },
+      {
+        key: "DEBUG_TOKEN",
+        group: "always",
+        kind: "secret",
+        hint: "Any long random string you invent, e.g. openssl rand -hex 32.",
+        placeholder: "your_debug_token",
+      },
+      {
+        key: "GITHUB_WEBHOOK_SECRET",
+        group: "github",
+        kind: "secret",
+        hint: "Same secret you will put in the GitHub webhook settings.",
+        placeholder: "your_github_webhook_secret",
+      },
+      {
+        key: "GITHUB_TOKEN",
+        group: "github",
+        kind: "secret",
+        hint: "Optional unless you need private-repo backfill.",
+        placeholder: "optional_github_token",
+      },
+      {
+        key: "GITHUB_TICKTICK_PROJECT_ID",
+        group: "github",
+        kind: "var",
+        hint: "TickTick list ID for GitHub tasks from /debug/projects.",
+        placeholder: "YOUR_GITHUB_TICKTICK_LIST_ID",
+      },
+      {
+        key: "GITHUB_LOGIN",
+        group: "github",
+        kind: "var",
+        hint: "Informational GitHub username.",
+        placeholder: "your-github-username",
+      },
+      {
+        key: "AZURE_DEVOPS_PAT",
+        group: "azure",
+        kind: "secret",
+        hint: "Azure DevOps PAT with Work Items Read.",
+        placeholder: "your_azure_devops_pat",
+      },
+      {
+        key: "AZURE_DEVOPS_WEBHOOK_USERNAME",
+        group: "azure",
+        kind: "secret",
+        hint: "Basic-auth username for Service Hooks.",
+        placeholder: "ticktick-sync",
+      },
+      {
+        key: "AZURE_DEVOPS_WEBHOOK_SECRET",
+        group: "azure",
+        kind: "secret",
+        hint: "Basic-auth password for Service Hooks.",
+        placeholder: "your_azure_devops_webhook_secret",
+      },
+      {
+        key: "AZURE_DEVOPS_TICKTICK_PROJECT_ID",
+        group: "azure",
+        kind: "var",
+        hint: "TickTick list ID for Azure DevOps tasks from /debug/projects.",
+        placeholder: "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID",
+      },
+      {
+        key: "AZURE_DEVOPS_ORG",
+        group: "azure",
+        kind: "var",
+        hint: "Organization name from the Azure DevOps URL.",
+        placeholder: "your-org",
+      },
+      {
+        key: "AZURE_DEVOPS_PROJECT",
+        group: "azure",
+        kind: "var",
+        hint: "Project name from the Azure DevOps URL.",
+        placeholder: "your-project",
+      },
+      {
+        key: "AZURE_DEVOPS_TEAM",
+        group: "azure",
+        kind: "var",
+        hint: "Team name for the current Taskboard / sprint.",
+        placeholder: "your-team",
+      },
+      {
+        key: "AZURE_DEVOPS_WORK_ITEM_TYPES",
+        group: "azure",
+        kind: "var",
+        hint: "Comma-separated types to sync.",
+        placeholder: "Task,Bug",
+      },
+    ];
 
     const els = {
       useGithub: document.getElementById("useGithub"),
@@ -835,6 +1039,7 @@ npm run deploy</pre>
       sourceWarning: document.getElementById("sourceWarning"),
       planSummary: document.getElementById("planSummary"),
       credentialTables: document.getElementById("credentialTables"),
+      keysForm: document.getElementById("keysForm"),
       devVars: document.getElementById("dev-vars"),
       varsSnippet: document.getElementById("vars-snippet"),
       secretCommands: document.getElementById("secret-commands"),
@@ -848,6 +1053,68 @@ npm run deploy</pre>
       importStatus: document.getElementById("importStatus"),
       printSheet: document.getElementById("printSheet"),
     };
+
+    function keyValue(key, fallback = "") {
+      const value = state.keys[key];
+      return typeof value === "string" && value.trim() ? value.trim() : fallback;
+    }
+
+    function keyOrPlaceholder(key, placeholder) {
+      return keyValue(key, placeholder);
+    }
+
+    function visibleKeyFields() {
+      return KEY_FIELDS.filter((field) => {
+        if (field.group === "always") return true;
+        if (field.group === "github") return state.useGithub;
+        if (field.group === "azure") return state.useAzure;
+        return false;
+      });
+    }
+
+    function escapeJsonString(value) {
+      return JSON.stringify(value).slice(1, -1);
+    }
+
+    function renderKeysForm() {
+      const fields = visibleKeyFields();
+      els.keysForm.innerHTML = fields
+        .map(
+          (field) => `
+        <div class="key-field">
+          <label for="key-${field.key}">
+            <span><code>${field.key}</code></span>
+            <span class="kind">${field.kind}</span>
+          </label>
+          <div class="hint">${field.hint}</div>
+          <input
+            id="key-${field.key}"
+            data-key-name="${field.key}"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="${escapeHtml(field.placeholder)}"
+            value="${escapeHtml(state.keys[field.key] || "")}"
+          />
+        </div>
+      `,
+        )
+        .join("");
+
+      els.keysForm.querySelectorAll("input[data-key-name]").forEach((input) => {
+        input.addEventListener("input", () => {
+          const keyName = input.getAttribute("data-key-name");
+          if (!keyName) return;
+          state.keys[keyName] = input.value;
+          renderDevVars();
+          renderVarsSnippet();
+          renderSecretCommands();
+          renderVerifySection();
+          renderListGuidance();
+          bindCopies();
+        });
+      });
+    }
 
     function escapeHtml(value) {
       return value
@@ -937,24 +1204,35 @@ npm run deploy</pre>
     function renderDevVars() {
       const lines = [
         "# Always required",
-        "TICKTICK_CLIENT_ID=your_ticktick_client_id",
-        "TICKTICK_CLIENT_SECRET=your_ticktick_client_secret",
-        "DEBUG_TOKEN=your_debug_token",
+        `TICKTICK_CLIENT_ID=${keyOrPlaceholder("TICKTICK_CLIENT_ID", "your_ticktick_client_id")}`,
+        `TICKTICK_CLIENT_SECRET=${keyOrPlaceholder("TICKTICK_CLIENT_SECRET", "your_ticktick_client_secret")}`,
+        `DEBUG_TOKEN=${keyOrPlaceholder("DEBUG_TOKEN", "your_debug_token")}`,
         "",
       ];
 
       if (state.useGithub) {
         lines.push("# Only if using GitHub");
-        lines.push("GITHUB_WEBHOOK_SECRET=your_github_webhook_secret");
-        lines.push(`GITHUB_TOKEN=${state.privateGithub ? "your_github_pat_for_private_repo_backfill" : "optional_github_token"}`);
+        lines.push(
+          `GITHUB_WEBHOOK_SECRET=${keyOrPlaceholder("GITHUB_WEBHOOK_SECRET", "your_github_webhook_secret")}`,
+        );
+        lines.push(
+          `GITHUB_TOKEN=${keyOrPlaceholder(
+            "GITHUB_TOKEN",
+            state.privateGithub ? "your_github_pat_for_private_repo_backfill" : "optional_github_token",
+          )}`,
+        );
         lines.push("");
       }
 
       if (state.useAzure) {
         lines.push("# Only if using Azure DevOps");
-        lines.push("AZURE_DEVOPS_PAT=your_azure_devops_pat");
-        lines.push("AZURE_DEVOPS_WEBHOOK_USERNAME=ticktick-sync");
-        lines.push("AZURE_DEVOPS_WEBHOOK_SECRET=your_azure_devops_webhook_secret");
+        lines.push(`AZURE_DEVOPS_PAT=${keyOrPlaceholder("AZURE_DEVOPS_PAT", "your_azure_devops_pat")}`);
+        lines.push(
+          `AZURE_DEVOPS_WEBHOOK_USERNAME=${keyOrPlaceholder("AZURE_DEVOPS_WEBHOOK_USERNAME", "ticktick-sync")}`,
+        );
+        lines.push(
+          `AZURE_DEVOPS_WEBHOOK_SECRET=${keyOrPlaceholder("AZURE_DEVOPS_WEBHOOK_SECRET", "your_azure_devops_webhook_secret")}`,
+        );
       }
 
       els.devVars.textContent = lines.join("\n");
@@ -962,23 +1240,47 @@ npm run deploy</pre>
 
     function renderVarsSnippet() {
       const vars = [];
+      const githubListFallback = state.sharedList
+        ? "SAME_AS_GITHUB_LIST_ID_OR_SHARED_LIST_ID"
+        : "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID";
+      const azureListValue = state.sharedList
+        ? keyOrPlaceholder(
+            "AZURE_DEVOPS_TICKTICK_PROJECT_ID",
+            keyOrPlaceholder("GITHUB_TICKTICK_PROJECT_ID", githubListFallback),
+          )
+        : keyOrPlaceholder("AZURE_DEVOPS_TICKTICK_PROJECT_ID", "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID");
+
       if (state.useGithub) {
-        vars.push('  "GITHUB_TICKTICK_PROJECT_ID": "YOUR_GITHUB_TICKTICK_LIST_ID",');
-        vars.push('  "GITHUB_LOGIN": "your-github-username",');
+        vars.push(
+          `  "GITHUB_TICKTICK_PROJECT_ID": "${escapeJsonString(keyOrPlaceholder("GITHUB_TICKTICK_PROJECT_ID", "YOUR_GITHUB_TICKTICK_LIST_ID"))}",`,
+        );
+        vars.push(
+          `  "GITHUB_LOGIN": "${escapeJsonString(keyOrPlaceholder("GITHUB_LOGIN", "your-github-username"))}",`,
+        );
       }
       if (state.useAzure) {
-        vars.push(`  "AZURE_DEVOPS_TICKTICK_PROJECT_ID": "${state.sharedList ? "SAME_AS_GITHUB_LIST_ID_OR_SHARED_LIST_ID" : "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID"}",`);
-        vars.push('  "AZURE_DEVOPS_ORG": "your-org",');
-        vars.push('  "AZURE_DEVOPS_PROJECT": "your-project",');
-        vars.push('  "AZURE_DEVOPS_TEAM": "your-team",');
-        vars.push('  "AZURE_DEVOPS_WORK_ITEM_TYPES": "Task,Bug",');
+        vars.push(`  "AZURE_DEVOPS_TICKTICK_PROJECT_ID": "${escapeJsonString(azureListValue)}",`);
+        vars.push(
+          `  "AZURE_DEVOPS_ORG": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_ORG", "your-org"))}",`,
+        );
+        vars.push(
+          `  "AZURE_DEVOPS_PROJECT": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_PROJECT", "your-project"))}",`,
+        );
+        vars.push(
+          `  "AZURE_DEVOPS_TEAM": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_TEAM", "your-team"))}",`,
+        );
+        vars.push(
+          `  "AZURE_DEVOPS_WORK_ITEM_TYPES": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_WORK_ITEM_TYPES", "Task,Bug"))}",`,
+        );
       }
       if (!state.useGithub && !state.useAzure) {
-        vars.push('  "GITHUB_LOGIN": "your-github-username"');
+        vars.push(
+          `  "GITHUB_LOGIN": "${escapeJsonString(keyOrPlaceholder("GITHUB_LOGIN", "your-github-username"))}"`,
+        );
       }
 
       const cleaned = vars.map((line, index) =>
-        index === vars.length - 1 ? line.replace(/,$/, "") : line
+        index === vars.length - 1 ? line.replace(/,$/, "") : line,
       );
 
       els.varsSnippet.textContent = `"vars": {\n${cleaned.join("\n")}\n}`;
@@ -1037,7 +1339,7 @@ Events: Issues only`)}
           <li>
             <strong>Backfill existing open issues</strong>
             ${codeBlock("github-backfill", `curl -X POST \\
-  -H "Authorization: Bearer YOUR_DEBUG_TOKEN" \\
+  -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
   "https://<your-worker>.workers.dev/sync/github/open-issues?repo=OWNER/REPO"`)}
           </li>
           <li>
@@ -1141,26 +1443,33 @@ Resource details to send: All`)}
     }
 
     function buildVerifyCommands() {
+      const debugToken = keyOrPlaceholder("DEBUG_TOKEN", "$DEBUG_TOKEN");
+      const authHeader = `Authorization: Bearer ${debugToken}`;
       const lines = [
-        'curl https://<worker>/health',
-        'curl -H "Authorization: Bearer $DEBUG_TOKEN" https://<worker>/debug/projects',
+        "curl https://<worker>/health",
+        `curl -H "${authHeader}" https://<worker>/debug/projects`,
       ];
       if (state.useGithub) {
-        lines.push('');
-        lines.push('# GitHub');
-        lines.push('curl -X POST -H "Authorization: Bearer $DEBUG_TOKEN" \\');
+        lines.push("");
+        lines.push("# GitHub");
+        lines.push(`curl -X POST -H "${authHeader}" \\`);
         lines.push('  "https://<worker>/sync/github/open-issues?repo=OWNER/REPO"');
       }
       if (state.useAzure) {
-        lines.push('');
-        lines.push('# Azure DevOps');
-        lines.push('curl -X POST -H "Authorization: Bearer $DEBUG_TOKEN" \\');
+        lines.push("");
+        lines.push("# Azure DevOps");
+        lines.push(`curl -X POST -H "${authHeader}" \\`);
         lines.push('  "https://<worker>/sync/azure-devops/taskboard"');
       }
       return lines.join("\n");
     }
 
     function buildExportPayload() {
+      const keys = {};
+      for (const field of visibleKeyFields()) {
+        keys[field.key] = state.keys[field.key] || "";
+      }
+
       return {
         exportedAt: new Date().toISOString(),
         app: "ticktick-sync-onboarding",
@@ -1170,6 +1479,7 @@ Resource details to send: All`)}
           sharedList: state.sharedList,
           privateGithub: state.privateGithub,
         },
+        keys,
         generated: {
           devVarsTemplate: els.devVars.textContent || "",
           wranglerVarsSnippet: els.varsSnippet.textContent || "",
@@ -1178,7 +1488,7 @@ Resource details to send: All`)}
           listGuidance: els.listGuidance.textContent || "",
         },
         notes: [
-          "Fill in real secret values separately; this export contains your selected plan and placeholder templates.",
+          "This export may contain live secret values if you filled in the key fields.",
           "Complete TickTick OAuth in both local and production because local and remote D1 databases are separate.",
         ],
       };
@@ -1205,34 +1515,22 @@ Resource details to send: All`)}
 
     function buildRecreationBodyHtml() {
       const payload = buildExportPayload();
-      const secrets = [
-        "TICKTICK_CLIENT_ID",
-        "TICKTICK_CLIENT_SECRET",
-        "DEBUG_TOKEN",
-      ];
-      const vars = [];
-
-      if (state.useGithub) {
-        secrets.push("GITHUB_WEBHOOK_SECRET");
-        if (state.privateGithub) secrets.push("GITHUB_TOKEN (required for private backfill)");
-        else secrets.push("GITHUB_TOKEN (optional)");
-        vars.push("GITHUB_TICKTICK_PROJECT_ID");
-        vars.push("GITHUB_LOGIN (optional)");
-      }
-      if (state.useAzure) {
-        secrets.push("AZURE_DEVOPS_PAT");
-        secrets.push("AZURE_DEVOPS_WEBHOOK_USERNAME");
-        secrets.push("AZURE_DEVOPS_WEBHOOK_SECRET");
-        vars.push("AZURE_DEVOPS_TICKTICK_PROJECT_ID");
-        vars.push("AZURE_DEVOPS_ORG");
-        vars.push("AZURE_DEVOPS_PROJECT");
-        vars.push("AZURE_DEVOPS_TEAM (recommended)");
-        vars.push("AZURE_DEVOPS_WORK_ITEM_TYPES (default Task,Bug)");
-      }
+      const fields = visibleKeyFields();
+      const secretFields = fields.filter((field) => field.kind === "secret");
+      const varFields = fields.filter((field) => field.kind === "var");
 
       const listMode = state.sharedList
         ? "Use one shared TickTick list for all enabled sources."
         : "Use separate TickTick lists per enabled source.";
+
+      const renderFieldList = (items) =>
+        items
+          .map((field) => {
+            const value = keyValue(field.key);
+            const shown = value || `(not filled — placeholder: ${field.placeholder})`;
+            return `<li><code>${escapeHtml(field.key)}</code><br />${escapeHtml(shown)}</li>`;
+          })
+          .join("");
 
       return `
   <h1>TickTick Sync recreation configuration</h1>
@@ -1251,17 +1549,17 @@ Resource details to send: All`)}
     </ul>
   </div>
 
-  <h2>Secrets to configure</h2>
+  <h2>Secrets</h2>
   <div class="card">
-    <ul>${secrets.map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul>
+    <ul>${renderFieldList(secretFields)}</ul>
   </div>
 
-  <h2>Non-secret vars to configure</h2>
+  <h2>Non-secret vars</h2>
   <div class="card">
-    ${vars.length ? `<ul>${vars.map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul>` : "<p>No source-specific vars selected.</p>"}
+    ${varFields.length ? `<ul>${renderFieldList(varFields)}</ul>` : "<p>No source-specific vars selected.</p>"}
   </div>
 
-  <h2>.dev.vars template</h2>
+  <h2>.dev.vars</h2>
   <pre>${escapeHtml(payload.generated.devVarsTemplate || "")}</pre>
 
   <h2>wrangler.jsonc vars snippet</h2>
@@ -1276,10 +1574,10 @@ Resource details to send: All`)}
   <h2>Rebuild checklist</h2>
   <div class="card">
     <ol>
-      <li>Install dependencies and create <code>.dev.vars</code> from the template above.</li>
+      <li>Install dependencies and create <code>.dev.vars</code> from the values above.</li>
       <li>Put the vars snippet into <code>wrangler.jsonc</code>.</li>
       <li>Run <code>npm run db:migrate:local</code>, <code>npm run cf-typegen</code>, and <code>npm run dev</code>.</li>
-      <li>Complete TickTick OAuth and set the TickTick list ID(s).</li>
+      <li>Complete TickTick OAuth and confirm the TickTick list ID(s).</li>
       <li>Deploy with remote migrations + the Wrangler secret commands above.</li>
       <li>Complete production TickTick OAuth, then configure only the enabled source webhooks.</li>
       <li>Run the verification commands for the enabled sources.</li>
@@ -1287,7 +1585,7 @@ Resource details to send: All`)}
   </div>
 
   <p class="note">
-    This PDF is a recreation sheet for your selected plan only. It does not include real secret values.
+    This PDF is a recreation sheet for your selected plan. Treat it as secret if you filled in live keys.
   </p>`;
     }
 
@@ -1326,6 +1624,16 @@ Resource details to send: All`)}
       state.useAzure = Boolean(selections.useAzure);
       state.sharedList = Boolean(selections.sharedList);
       state.privateGithub = Boolean(selections.privateGithub);
+
+      const importedKeys =
+        payload.keys && typeof payload.keys === "object" ? payload.keys : {};
+      state.keys = {};
+      for (const field of KEY_FIELDS) {
+        const value = importedKeys[field.key];
+        if (typeof value === "string") {
+          state.keys[field.key] = value;
+        }
+      }
 
       els.useGithub.checked = state.useGithub;
       els.useAzure.checked = state.useAzure;
@@ -1403,6 +1711,7 @@ Resource details to send: All`)}
       updateCounts();
       renderPlanSummary();
       renderCredentialTables();
+      renderKeysForm();
       renderDevVars();
       renderVarsSnippet();
       renderSecretCommands();
