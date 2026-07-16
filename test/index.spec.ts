@@ -83,4 +83,52 @@ describe("ticktick-sync worker", () => {
 			error: "Unauthorized debug access.",
 		});
 	});
+
+	it("rejects Azure DevOps webhooks with invalid basic auth", async () => {
+		const request = new IncomingRequest("https://example.com/webhooks/azure-devops", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				authorization: `Basic ${btoa("wrong:credentials")}`,
+			},
+			body: JSON.stringify({ eventType: "workitem.created" }),
+		});
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(
+			request,
+			{
+				AZURE_DEVOPS_WEBHOOK_USERNAME: "ticktick-sync",
+				AZURE_DEVOPS_WEBHOOK_SECRET: "webhook-secret",
+			} as Env,
+			ctx,
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(401);
+		expect(await response.json()).toMatchObject({
+			ok: false,
+			error: "Invalid Azure DevOps webhook credentials.",
+		});
+	});
+
+	it("requires DEBUG_TOKEN for the Azure DevOps taskboard sync endpoint", async () => {
+		const request = new IncomingRequest("https://example.com/sync/azure-devops/taskboard", {
+			method: "POST",
+		});
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(
+			request,
+			{
+				DEBUG_TOKEN: "debug-secret",
+			} as Env,
+			ctx,
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(401);
+		expect(await response.json()).toMatchObject({
+			ok: false,
+			error: "Unauthorized debug access.",
+		});
+	});
 });

@@ -23,7 +23,11 @@
 	],
 	"vars": {
 		"TICKTICK_PROJECT_ID": "6a0713d8e9ad3a00000003a9",
-		"GITHUB_LOGIN": "KiwiGeek"
+		"GITHUB_LOGIN": "KiwiGeek",
+		"AZURE_DEVOPS_ORG": "YOUR_ORG",
+		"AZURE_DEVOPS_PROJECT": "YOUR_PROJECT",
+		"AZURE_DEVOPS_TEAM": "YOUR_TEAM",
+		"AZURE_DEVOPS_WORK_ITEM_TYPES": "Task,Bug"
 	}
 	/**
 	 * Smart Placement
