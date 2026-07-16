@@ -1535,15 +1535,13 @@ npm run deploy</pre>
       els.githubContent.innerHTML = `
         <div class="timeline">
           <li>
-            <strong>Create a GitHub webhook secret</strong>
-            <p>Generate a random secret and save it as <code>GITHUB_WEBHOOK_SECRET</code>. Use the exact same value in the GitHub webhook settings.</p>
-          </li>
-          <li>
-            <strong>${state.privateGithub ? "Create a GitHub PAT" : "Optional: create a GitHub PAT"}</strong>
+            <strong>Confirm credentials from earlier steps</strong>
             <p>
+              Use the <code>GITHUB_WEBHOOK_SECRET</code> you invented in Step 3
+              ${state.privateGithub ? " and the <code>GITHUB_TOKEN</code> from Step 5" : ""}.
               ${state.privateGithub
-                ? "You said you need private-repository backfill, so create a PAT with access to the target repos."
-                : "A PAT is only needed for private-repository backfill or better API rate limits."}
+                ? "Private-repo backfill requires a PAT with access to the target repos."
+                : "A PAT is optional unless you need private-repo backfill or higher rate limits."}
             </p>
           </li>
           <li>
@@ -1593,21 +1591,17 @@ Events: Issues only`)}
       els.azureContent.innerHTML = `
         <div class="timeline">
           <li>
-            <strong>Read org / project / team from your board URL</strong>
-            ${codeBlock("azure-url-example", `Example URL:
+            <strong>Confirm credentials from earlier steps</strong>
+            <p>
+              Org/project/team and <code>AZURE_DEVOPS_PAT</code> come from Step 5.
+              Service Hook username/password come from the inventable secrets in Step 3.
+            </p>
+            ${codeBlock("azure-url-example", `Example board URL → vars:
 https://dev.azure.com/Contoso/Fabrikam/_boards/taskboard/TeamAlpha
 
 AZURE_DEVOPS_ORG=Contoso
 AZURE_DEVOPS_PROJECT=Fabrikam
 AZURE_DEVOPS_TEAM=TeamAlpha`)}
-          </li>
-          <li>
-            <strong>Create an Azure DevOps PAT</strong>
-            <p>Go to Azure DevOps → User settings → Personal access tokens, then create a token with at least <code>Work Items → Read</code>.</p>
-          </li>
-          <li>
-            <strong>Create Service Hook credentials</strong>
-            <p>Choose a username such as <code>ticktick-sync</code> and generate a random password. Store them as <code>AZURE_DEVOPS_WEBHOOK_USERNAME</code> and <code>AZURE_DEVOPS_WEBHOOK_SECRET</code>.</p>
           </li>
           <li>
             <strong>Configure Azure DevOps Service Hooks</strong>
