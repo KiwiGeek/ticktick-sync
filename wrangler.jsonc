@@ -18,12 +18,17 @@
 		{
 			"binding": "ticktick_sync",
 			"database_name": "ticktick_sync",
-			"database_id": "c304e2d0-9de5-4ddb-90ce-d418848cfb50"
+			"database_id": "YOUR_D1_DATABASE_ID"
 		}
 	],
 	"vars": {
-		"TICKTICK_PROJECT_ID": "6a0713d8e9ad3a00000003a9",
-		"GITHUB_LOGIN": "KiwiGeek"
+		"GITHUB_TICKTICK_PROJECT_ID": "YOUR_GITHUB_TICKTICK_LIST_ID",
+		"AZURE_DEVOPS_TICKTICK_PROJECT_ID": "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID",
+		"GITHUB_LOGIN": "your-github-username",
+		"AZURE_DEVOPS_ORG": "YOUR_ORG",
+		"AZURE_DEVOPS_PROJECT": "YOUR_PROJECT",
+		"AZURE_DEVOPS_TEAM": "YOUR_TEAM",
+		"AZURE_DEVOPS_WORK_ITEM_TYPES": "Bug,Task,User Story,Product Backlog Item,Issue"
 	}
 	/**
 	 * Smart Placement
