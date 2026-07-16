@@ -962,7 +962,7 @@ npm run deploy</pre>
         group: "always",
         kind: "secret",
         hint: "OAuth client ID for TickTick API access.",
-        where: "Create an app at https://developer.ticktick.com/ → open the app → copy Client ID. Register both local and production callback URLs.",
+        where: "Create an app at https://developer.ticktick.com/ → open the app → copy Client ID. In the app’s OAuth redirect / callback settings, register both URLs exactly:<br />• Local: <code>http://localhost:8787/auth/ticktick/callback</code><br />• Production: <code>https://&lt;your-worker&gt;.workers.dev/auth/ticktick/callback</code><br />Replace <code>&lt;your-worker&gt;</code> with your Cloudflare Workers subdomain (or custom domain). Mismatched scheme/host/path causes OAuth redirect errors.",
         placeholder: "your_ticktick_client_id",
       },
       {
@@ -970,7 +970,7 @@ npm run deploy</pre>
         group: "always",
         kind: "secret",
         hint: "OAuth client secret for TickTick API access.",
-        where: "Same TickTick developer app page as Client ID → copy Client Secret. Keep it private.",
+        where: "Same TickTick developer app as Client ID → copy Client Secret. Keep it private. Callback URLs (must already be registered on that app): <code>http://localhost:8787/auth/ticktick/callback</code> and <code>https://&lt;your-worker&gt;.workers.dev/auth/ticktick/callback</code>.",
         placeholder: "your_ticktick_client_secret",
       },
       {
