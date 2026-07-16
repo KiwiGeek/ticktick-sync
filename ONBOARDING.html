@@ -724,12 +724,20 @@
             </li>
             <li>
               <strong>Confirm or create the D1 database</strong>
-              <p>The repo references a D1 database named <code>ticktick_sync</code>. Create one if this is a new account/project:</p>
+              <p>
+                <code>wrangler.jsonc</code> already lists a D1 binding named <code>ticktick_sync</code>, but the
+                <code>database_id</code> in the repo belongs to the original author’s Cloudflare account.
+                On <strong>your</strong> account that ID will not exist, so remote migrate/deploy will fail until you create your own database and point the config at it.
+              </p>
               <div class="code-block">
                 <button class="copy-btn" data-copy-target="d1-create">Copy</button>
                 <pre id="d1-create">npx wrangler d1 create ticktick_sync</pre>
               </div>
-              <p class="footer-note">Paste the returned <code>database_id</code> into <code>wrangler.jsonc</code> if needed.</p>
+              <p class="footer-note">
+                Copy the UUID from the command output into <code>wrangler.jsonc</code> →
+                <code>d1_databases[0].database_id</code>.
+                Local <code>npm run db:migrate:local</code> / <code>npm run dev</code> can work without this, but production deploy cannot.
+              </p>
             </li>
             <li>
               <strong>Decide your production Worker hostname</strong>
