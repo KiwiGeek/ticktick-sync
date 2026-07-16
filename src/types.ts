@@ -4,8 +4,10 @@ export interface AppBindings {
 	TICKTICK_CLIENT_SECRET: string;
 	GITHUB_WEBHOOK_SECRET: string;
 	GITHUB_TOKEN?: string;
-	TICKTICK_PROJECT_ID: string;
+	GITHUB_TICKTICK_PROJECT_ID?: string;
 	AZURE_DEVOPS_TICKTICK_PROJECT_ID?: string;
+	/** @deprecated Prefer GITHUB_TICKTICK_PROJECT_ID / AZURE_DEVOPS_TICKTICK_PROJECT_ID. Kept as shared fallback. */
+	TICKTICK_PROJECT_ID?: string;
 	GITHUB_LOGIN: string;
 	DEBUG_TOKEN?: string;
 	AZURE_DEVOPS_ORG?: string;

@@ -103,14 +103,31 @@ const buildSyncedItemRow = (
 	updated_at: new Date().toISOString(),
 });
 
+const isConfiguredProjectId = (value: string | undefined): value is string => {
+	const trimmed = value?.trim();
+	return Boolean(trimmed && !/^YOUR[_-]/i.test(trimmed));
+};
+
 const resolveTickTickProjectId = (env: AppBindings, source: string): string => {
 	if (source === AZURE_DEVOPS_SOURCE) {
-		const azureProjectId = env.AZURE_DEVOPS_TICKTICK_PROJECT_ID?.trim();
-		if (azureProjectId && !/^YOUR[_-]/i.test(azureProjectId)) {
-			return azureProjectId;
+		if (isConfiguredProjectId(env.AZURE_DEVOPS_TICKTICK_PROJECT_ID)) {
+			return env.AZURE_DEVOPS_TICKTICK_PROJECT_ID.trim();
+		}
+	} else if (source === "github_issue") {
+		if (isConfiguredProjectId(env.GITHUB_TICKTICK_PROJECT_ID)) {
+			return env.GITHUB_TICKTICK_PROJECT_ID.trim();
 		}
 	}
-	return env.TICKTICK_PROJECT_ID;
+
+	if (isConfiguredProjectId(env.TICKTICK_PROJECT_ID)) {
+		return env.TICKTICK_PROJECT_ID.trim();
+	}
+
+	throw new Error(
+		source === AZURE_DEVOPS_SOURCE
+			? "AZURE_DEVOPS_TICKTICK_PROJECT_ID (or TICKTICK_PROJECT_ID) must be configured."
+			: "GITHUB_TICKTICK_PROJECT_ID (or TICKTICK_PROJECT_ID) must be configured.",
+	);
 };
 
 const syncItemToTickTick = async (
