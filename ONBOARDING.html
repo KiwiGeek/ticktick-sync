@@ -73,16 +73,16 @@
     }
 
     .hero {
-      padding: 32px;
+      padding: 22px 24px;
       position: sticky;
-      top: 16px;
+      top: 10px;
       z-index: 2;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
     }
 
     .hero-grid {
       display: grid;
-      gap: 24px;
+      gap: 18px;
       grid-template-columns: 1.4fr 0.9fr;
       align-items: start;
     }
@@ -102,7 +102,7 @@
     }
 
     h1, h2, h3 { margin: 0 0 12px; line-height: 1.1; }
-    h1 { font-size: clamp(2rem, 4vw, 3.4rem); }
+    h1 { font-size: clamp(1.8rem, 3.4vw, 2.7rem); }
     h2 { font-size: clamp(1.35rem, 2vw, 1.9rem); }
     h3 { font-size: 1.05rem; }
 
@@ -112,11 +112,11 @@
 
     .chips, .stack { display: flex; flex-wrap: wrap; gap: 10px; }
     .chip {
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
       background: color-mix(in srgb, var(--panel-strong) 70%, transparent);
       border: 1px solid var(--border);
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text);
     }
 
@@ -129,9 +129,39 @@
 
     .sidebar {
       position: sticky;
-      top: 210px;
+      top: 148px;
       display: grid;
       gap: 16px;
+    }
+
+    .hero-tip {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .action-btn {
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-strong) 82%, transparent);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      border-color: transparent;
     }
 
     .panel { padding: 24px; }
@@ -321,6 +351,21 @@
       .sidebar { position: static; }
       .stats { grid-template-columns: 1fr; }
     }
+
+    @media print {
+      body { background: white !important; }
+      .shell { width: 100%; padding: 0; }
+      .hero, .panel {
+        box-shadow: none;
+        backdrop-filter: none;
+        background: white;
+      }
+      .hero, .sidebar, .copy-btn, .button-row {
+        position: static !important;
+      }
+      .sidebar { display: none; }
+      .grid { display: block; }
+    }
   </style>
 </head>
 <body>
@@ -342,6 +387,7 @@
             <div class="chip">Azure DevOps Service Hooks</div>
             <div class="chip">Light / dark mode</div>
           </div>
+          <p class="hero-tip">Tip: choose your sources first, then export the finished plan near the bottom of the page.</p>
         </div>
         <div class="panel" style="padding:20px;">
           <h3 style="margin-bottom:10px;">How to use this page</h3>
@@ -367,6 +413,7 @@
             <li><a href="#github">GitHub setup</a></li>
             <li><a href="#azure">Azure DevOps setup</a></li>
             <li><a href="#verify">Verification</a></li>
+            <li><a href="#export">Export</a></li>
             <li><a href="#troubleshooting">Troubleshooting</a></li>
           </ul>
         </section>
@@ -595,6 +642,25 @@ npm run deploy</pre>
           <div id="verifyContent"></div>
         </section>
 
+        <section class="panel" id="export">
+          <div class="eyebrow">Save it</div>
+          <h2>Export your onboarding plan</h2>
+          <p>
+            Save the choices you made, the generated snippets, and the verification commands so you can keep this configuration for later.
+          </p>
+          <div class="callout success">
+            <strong>Best option</strong>
+            Export JSON to preserve the structured plan. If you want something easy to share or archive visually, use print-to-PDF.
+          </div>
+          <div class="button-row">
+            <button class="action-btn primary" id="exportJsonBtn" type="button">Export plan as JSON</button>
+            <button class="action-btn" id="printPdfBtn" type="button">Print / save as PDF</button>
+          </div>
+          <p class="footer-note">
+            JSON includes your chosen sources, routing mode, generated env templates, secret commands, and verification commands. Secret placeholders are exported, not real secret values.
+          </p>
+        </section>
+
         <section class="panel" id="troubleshooting">
           <div class="eyebrow">Support</div>
           <h2>Common failures</h2>
@@ -671,6 +737,8 @@ npm run deploy</pre>
       azureContent: document.getElementById("azureContent"),
       verifyContent: document.getElementById("verifyContent"),
       listGuidance: document.getElementById("list-guidance"),
+      exportJsonBtn: document.getElementById("exportJsonBtn"),
+      printPdfBtn: document.getElementById("printPdfBtn"),
     };
 
     function escapeHtml(value) {
@@ -984,6 +1052,42 @@ Resource details to send: All`)}
       return lines.join("\n");
     }
 
+    function buildExportPayload() {
+      return {
+        exportedAt: new Date().toISOString(),
+        app: "ticktick-sync-onboarding",
+        selections: {
+          useGithub: state.useGithub,
+          useAzure: state.useAzure,
+          sharedList: state.sharedList,
+          privateGithub: state.privateGithub,
+        },
+        generated: {
+          devVarsTemplate: els.devVars.textContent || "",
+          wranglerVarsSnippet: els.varsSnippet.textContent || "",
+          wranglerSecretCommands: els.secretCommands.textContent || "",
+          verifyCommands: buildVerifyCommands(),
+          listGuidance: els.listGuidance.textContent || "",
+        },
+        notes: [
+          "Fill in real secret values separately; this export contains your selected plan and placeholder templates.",
+          "Complete TickTick OAuth in both local and production because local and remote D1 databases are separate.",
+        ],
+      };
+    }
+
+    function downloadFile(filename, content, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
     function renderListGuidance() {
       if (state.useGithub && state.useAzure && !state.sharedList) {
         els.listGuidance.textContent = "Copy one list ID into GITHUB_TICKTICK_PROJECT_ID and a different one into AZURE_DEVOPS_TICKTICK_PROJECT_ID.";
@@ -1056,6 +1160,20 @@ Resource details to send: All`)}
 
     [els.useGithub, els.useAzure, els.sharedList, els.privateGithub].forEach((input) => {
       input.addEventListener("change", syncState);
+    });
+
+    els.exportJsonBtn.addEventListener("click", () => {
+      const payload = buildExportPayload();
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadFile(
+        `ticktick-sync-onboarding-plan-${stamp}.json`,
+        JSON.stringify(payload, null, 2),
+        "application/json"
+      );
+    });
+
+    els.printPdfBtn.addEventListener("click", () => {
+      window.print();
     });
 
     render();
