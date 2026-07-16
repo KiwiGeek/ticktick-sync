@@ -1244,8 +1244,8 @@ npm run deploy</pre>
         <table>
           <thead><tr><th>Name</th><th>Type</th><th>Used for</th><th>Where to get it</th></tr></thead>
           <tbody>
-            <tr><td><code>TICKTICK_CLIENT_ID</code></td><td>Secret</td><td>TickTick OAuth</td><td>TickTick Developer app</td></tr>
-            <tr><td><code>TICKTICK_CLIENT_SECRET</code></td><td>Secret</td><td>TickTick OAuth</td><td>TickTick Developer app</td></tr>
+            <tr><td><code>TICKTICK_CLIENT_ID</code></td><td>Secret</td><td>TickTick OAuth</td><td>TickTick Developer app; register callbacks <code>http://localhost:8787/auth/ticktick/callback</code> and <code>https://&lt;worker&gt;.workers.dev/auth/ticktick/callback</code></td></tr>
+            <tr><td><code>TICKTICK_CLIENT_SECRET</code></td><td>Secret</td><td>TickTick OAuth</td><td>Same TickTick Developer app as Client ID</td></tr>
             <tr><td><code>DEBUG_TOKEN</code></td><td>Secret</td><td>Protecting debug and backfill endpoints</td><td>Use <em>Generate</em> on this page, or prefer <code>openssl rand -hex 32</code></td></tr>
           </tbody>
         </table>
