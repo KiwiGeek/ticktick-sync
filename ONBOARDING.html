@@ -250,6 +250,43 @@
       line-height: 1.45;
     }
 
+    .key-field .where {
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+      background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
+      padding: 0;
+    }
+
+    .key-field .where summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      user-select: none;
+    }
+
+    .key-field .where summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .key-field .where summary::before {
+      content: "▸ ";
+      color: var(--muted);
+    }
+
+    .key-field .where[open] summary::before {
+      content: "▾ ";
+    }
+
+    .key-field .where .where-body {
+      padding: 0 10px 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
     .key-field input {
       width: 100%;
       border: 1px solid var(--border);
@@ -683,7 +720,8 @@
           <div class="eyebrow">Step 2b</div>
           <h2>Enter the keys you generated</h2>
           <p>
-            Paste the real values here as you create them. The generated
+            Each field below shows <strong>where to create or find</strong> that value.
+            Paste the real values as you create them — the generated
             <code>.dev.vars</code>, <code>wrangler.jsonc</code> snippet, verification commands,
             JSON export, and PDF recreation sheet will all use these values.
           </p>
@@ -923,14 +961,16 @@ npm run deploy</pre>
         key: "TICKTICK_CLIENT_ID",
         group: "always",
         kind: "secret",
-        hint: "From your TickTick developer app.",
+        hint: "OAuth client ID for TickTick API access.",
+        where: "Create an app at https://developer.ticktick.com/ → open the app → copy Client ID. Register both local and production callback URLs.",
         placeholder: "your_ticktick_client_id",
       },
       {
         key: "TICKTICK_CLIENT_SECRET",
         group: "always",
         kind: "secret",
-        hint: "From your TickTick developer app.",
+        hint: "OAuth client secret for TickTick API access.",
+        where: "Same TickTick developer app page as Client ID → copy Client Secret. Keep it private.",
         placeholder: "your_ticktick_client_secret",
       },
       {
@@ -938,7 +978,8 @@ npm run deploy</pre>
         group: "always",
         kind: "secret",
         generatable: true,
-        hint: "Any long random string. Use Generate, or prefer openssl rand -hex 32.",
+        hint: "Bearer token that protects debug and backfill endpoints.",
+        where: "Invent it yourself: click Generate on this page, or run <code>openssl rand -hex 32</code> in a terminal (preferred). There is no external provider page for this value.",
         placeholder: "your_debug_token",
       },
       {
@@ -946,42 +987,48 @@ npm run deploy</pre>
         group: "github",
         kind: "secret",
         generatable: true,
-        hint: "Same secret you will put in the GitHub webhook settings. Use Generate, or prefer openssl.",
+        hint: "Shared secret used to verify GitHub webhook deliveries.",
+        where: "Invent it yourself (Generate or <code>openssl rand -hex 32</code>), then paste the <em>same</em> value into GitHub → repo Settings → Webhooks → Secret when you create the webhook.",
         placeholder: "your_github_webhook_secret",
       },
       {
         key: "GITHUB_TOKEN",
         group: "github",
         kind: "secret",
-        hint: "Optional unless you need private-repo backfill.",
+        hint: "Optional unless you need private-repo backfill or higher API rate limits.",
+        where: "GitHub → Settings → Developer settings → Personal access tokens → generate a classic or fine-grained token with access to the target repositories. Skip if you only sync public repos via webhooks.",
         placeholder: "optional_github_token",
       },
       {
         key: "GITHUB_TICKTICK_PROJECT_ID",
         group: "github",
         kind: "var",
-        hint: "TickTick list ID for GitHub tasks from /debug/projects.",
+        hint: "TickTick list ID that should receive GitHub issues.",
+        where: "After TickTick OAuth, call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for GitHub.",
         placeholder: "YOUR_GITHUB_TICKTICK_LIST_ID",
       },
       {
         key: "GITHUB_LOGIN",
         group: "github",
         kind: "var",
-        hint: "Informational GitHub username.",
+        hint: "Informational GitHub username shown in config / docs.",
+        where: "Your GitHub profile username (the handle in github.com/&lt;username&gt;). Not a secret.",
         placeholder: "your-github-username",
       },
       {
         key: "AZURE_DEVOPS_PAT",
         group: "azure",
         kind: "secret",
-        hint: "Azure DevOps PAT with Work Items Read.",
+        hint: "Personal access token used to read work items / Taskboard data.",
+        where: "Azure DevOps → User settings (top-right) → Personal access tokens → New Token. Scope at least <code>Work Items → Read</code>. Copy the token once when it is shown.",
         placeholder: "your_azure_devops_pat",
       },
       {
         key: "AZURE_DEVOPS_WEBHOOK_USERNAME",
         group: "azure",
         kind: "secret",
-        hint: "Basic-auth username for Service Hooks.",
+        hint: "Basic-auth username Azure DevOps Service Hooks will send.",
+        where: "Invent any username (e.g. <code>ticktick-sync</code>). Use the same value in Azure DevOps → Project settings → Service hooks → Web Hooks → Basic authentication username.",
         placeholder: "ticktick-sync",
       },
       {
@@ -989,42 +1036,48 @@ npm run deploy</pre>
         group: "azure",
         kind: "secret",
         generatable: true,
-        hint: "Basic-auth password for Service Hooks. Use Generate, or prefer openssl rand -hex 32.",
+        hint: "Basic-auth password Azure DevOps Service Hooks will send.",
+        where: "Invent it yourself (Generate or <code>openssl rand -hex 32</code>), then paste the <em>same</em> value into the Service Hook basic-auth password field.",
         placeholder: "your_azure_devops_webhook_secret",
       },
       {
         key: "AZURE_DEVOPS_TICKTICK_PROJECT_ID",
         group: "azure",
         kind: "var",
-        hint: "TickTick list ID for Azure DevOps tasks from /debug/projects.",
+        hint: "TickTick list ID that should receive Azure DevOps items.",
+        where: "After TickTick OAuth, call <code>GET /debug/projects</code> (Bearer = DEBUG_TOKEN) and copy the list <code>id</code> you want for Azure DevOps.",
         placeholder: "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID",
       },
       {
         key: "AZURE_DEVOPS_ORG",
         group: "azure",
         kind: "var",
-        hint: "Organization name from the Azure DevOps URL.",
+        hint: "Azure DevOps organization name.",
+        where: "From your board URL: <code>https://dev.azure.com/&lt;ORG&gt;/&lt;PROJECT&gt;/_boards/...</code> — the <code>&lt;ORG&gt;</code> segment.",
         placeholder: "your-org",
       },
       {
         key: "AZURE_DEVOPS_PROJECT",
         group: "azure",
         kind: "var",
-        hint: "Project name from the Azure DevOps URL.",
+        hint: "Azure DevOps project name.",
+        where: "From the same board URL — the <code>&lt;PROJECT&gt;</code> segment after the org.",
         placeholder: "your-project",
       },
       {
         key: "AZURE_DEVOPS_TEAM",
         group: "azure",
         kind: "var",
-        hint: "Team name for the current Taskboard / sprint.",
+        hint: "Team name for Taskboard / sprint backfill (optional for Kanban open-workitems).",
+        where: "From the board URL team segment, or Azure DevOps → Project settings → Teams. If omitted, the Worker falls back to the project name.",
         placeholder: "your-team",
       },
       {
         key: "AZURE_DEVOPS_WORK_ITEM_TYPES",
         group: "azure",
         kind: "var",
-        hint: "Comma-separated types to sync (Closed/Done skipped).",
+        hint: "Comma-separated work item types to sync. Closed/Done are always skipped.",
+        where: "Match the types on your board process (Agile/Scrum/Basic). Default works for most boards: <code>Bug,Task,User Story,Product Backlog Item,Issue</code>. Edit only if your process uses different type names.",
         placeholder: "Bug,Task,User Story,Product Backlog Item,Issue",
       },
     ];
@@ -1116,6 +1169,10 @@ npm run deploy</pre>
             <span class="kind">${field.kind}</span>
           </label>
           <div class="hint">${field.hint}</div>
+          <div class="where">
+            <strong>Where to get / generate it</strong>
+            ${field.where}
+          </div>
           <div class="key-field-controls">
             <input
               id="key-${field.key}"
