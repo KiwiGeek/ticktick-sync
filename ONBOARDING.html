@@ -611,14 +611,34 @@
               </div>
             </div>
 
-            <div class="question-group">
-              <h3>GitHub backfill target</h3>
+            <div class="question-group" id="githubBackfillGroup">
+              <h3>GitHub backfill</h3>
               <div class="option-row">
+                <label class="toggle">
+                  <input id="githubBackfill" type="checkbox" checked />
+                  <span>
+                    <strong>I want to backfill existing open GitHub issues</strong>
+                    Includes the <code>/sync/github/open-issues</code> step in your plan.
+                  </span>
+                </label>
                 <label class="toggle">
                   <input id="privateGithub" type="checkbox" />
                   <span>
                     <strong>I need GitHub backfill for private repositories</strong>
                     This means you should create a GitHub personal access token.
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="question-group" id="azureBackfillGroup">
+              <h3>Azure DevOps backfill</h3>
+              <div class="option-row">
+                <label class="toggle">
+                  <input id="azureBackfill" type="checkbox" checked />
+                  <span>
+                    <strong>I want to backfill open Azure DevOps board items</strong>
+                    Includes open-workitems / Taskboard sync steps. Closed items are always skipped.
                   </span>
                 </label>
               </div>
@@ -892,7 +912,9 @@ npm run deploy</pre>
       useGithub: true,
       useAzure: true,
       sharedList: false,
+      githubBackfill: true,
       privateGithub: false,
+      azureBackfill: true,
       keys: {},
     };
 
@@ -1011,7 +1033,11 @@ npm run deploy</pre>
       useGithub: document.getElementById("useGithub"),
       useAzure: document.getElementById("useAzure"),
       sharedList: document.getElementById("sharedList"),
+      githubBackfillGroup: document.getElementById("githubBackfillGroup"),
+      githubBackfill: document.getElementById("githubBackfill"),
       privateGithub: document.getElementById("privateGithub"),
+      azureBackfillGroup: document.getElementById("azureBackfillGroup"),
+      azureBackfill: document.getElementById("azureBackfill"),
       enabledCount: document.getElementById("enabledCount"),
       secretCount: document.getElementById("secretCount"),
       varCount: document.getElementById("varCount"),
@@ -1209,10 +1235,22 @@ npm run deploy</pre>
       const items = [];
       items.push(listItem("TickTick OAuth", "Always required for any setup."));
       if (state.useGithub) {
-        items.push(listItem("GitHub enabled", state.privateGithub ? "Create webhook secret and a PAT for private backfill." : "Create webhook secret; PAT optional."));
+        const githubBackfillNote = state.githubBackfill
+          ? state.privateGithub
+            ? "Create webhook secret and a PAT for private backfill."
+            : "Create webhook secret; include open-issues backfill; PAT optional."
+          : "Create webhook secret; skip open-issues backfill.";
+        items.push(listItem("GitHub enabled", githubBackfillNote));
       }
       if (state.useAzure) {
-        items.push(listItem("Azure DevOps enabled", "Create PAT, Service Hook credentials, and org/project vars. Backfill skips Closed."));
+        items.push(
+          listItem(
+            "Azure DevOps enabled",
+            state.azureBackfill
+              ? "Create PAT, Service Hook credentials, and org/project vars. Backfill open items (skips Closed)."
+              : "Create PAT, Service Hook credentials, and org/project vars. Skip board backfill.",
+          ),
+        );
       }
       items.push(listItem("TickTick list mode", state.sharedList ? "Use one shared TickTick list for all enabled sources." : "Use separate TickTick lists per source."));
       els.planSummary.innerHTML = items.join("");
@@ -1353,12 +1391,19 @@ Content type: application/json
 Secret: GITHUB_WEBHOOK_SECRET
 Events: Issues only`)}
           </li>
-          <li>
+          ${
+            state.githubBackfill
+              ? `<li>
             <strong>Backfill existing open issues</strong>
             ${codeBlock("github-backfill", `curl -X POST \\
   -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
   "https://<your-worker>.workers.dev/sync/github/open-issues?repo=OWNER/REPO"`)}
-          </li>
+          </li>`
+              : `<li>
+            <strong>Backfill skipped</strong>
+            <p>You turned off GitHub backfill in the questionnaire. New webhook events will still sync.</p>
+          </li>`
+          }
           <li>
             <strong>Expected behavior</strong>
             <ul class="compact-list">
@@ -1417,7 +1462,9 @@ Basic auth username: AZURE_DEVOPS_WEBHOOK_USERNAME
 Basic auth password: AZURE_DEVOPS_WEBHOOK_SECRET
 Resource details to send: All`)}
           </li>
-          <li>
+          ${
+            state.azureBackfill
+              ? `<li>
             <strong>Backfill open board items (skips Closed)</strong>
             <p>Use this for Kanban / backlog boards. Items already in the <strong>Closed</strong> column (or Done / Removed / Completed) are intentionally excluded.</p>
             ${codeBlock("azure-backfill-open", `curl -X POST \\
@@ -1429,14 +1476,19 @@ Resource details to send: All`)}
             ${codeBlock("azure-backfill-taskboard", `curl -X POST \\
   -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
   "https://<your-worker>.workers.dev/sync/azure-devops/taskboard"`)}
-          </li>
+          </li>`
+              : `<li>
+            <strong>Backfill skipped</strong>
+            <p>You turned off Azure DevOps backfill in the questionnaire. Service Hook events will still sync going forward.</p>
+          </li>`
+          }
           <li>
             <strong>Expected behavior</strong>
             <ul class="compact-list">
               <li>Open backlog / board item (not Closed) → TickTick task created in the Azure DevOps list</li>
               <li>Title/state updated while still open → task updated</li>
               <li>Moved to Done / Closed / Completed / Removed → task completed</li>
-              <li>Already-Closed items are never imported by backfill</li>
+              ${state.azureBackfill ? "<li>Already-Closed items are never imported by backfill</li>" : ""}
               <li>Reopened → fresh TickTick task created</li>
             </ul>
           </li>
@@ -1457,10 +1509,18 @@ Resource details to send: All`)}
       parts.push('<h3 style="margin-top:20px;">Checklist</h3><ul class="checklist">');
       parts.push("<li><strong>TickTick OAuth</strong> Verify that /debug/projects works in local and production.</li>");
       if (state.useGithub) {
-        parts.push("<li><strong>GitHub</strong> Open, edit, close, and reopen a test issue and watch the TickTick task follow it.</li>");
+        parts.push(
+          state.githubBackfill
+            ? "<li><strong>GitHub</strong> Optionally backfill open issues, then open/edit/close/reopen a test issue and watch TickTick follow it.</li>"
+            : "<li><strong>GitHub</strong> Open, edit, close, and reopen a test issue and watch the TickTick task follow it.</li>",
+        );
       }
       if (state.useAzure) {
-        parts.push("<li><strong>Azure DevOps</strong> Backfill with <code>/sync/azure-devops/open-workitems</code>, confirm Closed-column items were skipped, then create/update an open work item and confirm TickTick updates.</li>");
+        parts.push(
+          state.azureBackfill
+            ? "<li><strong>Azure DevOps</strong> Backfill with <code>/sync/azure-devops/open-workitems</code>, confirm Closed-column items were skipped, then create/update an open work item and confirm TickTick updates.</li>"
+            : "<li><strong>Azure DevOps</strong> Create or update an open work item via Service Hooks and confirm the TickTick task updates (backfill disabled in your plan).</li>",
+        );
       }
       parts.push("</ul>");
 
@@ -1474,15 +1534,15 @@ Resource details to send: All`)}
         "curl https://<worker>/health",
         `curl -H "${authHeader}" https://<worker>/debug/projects`,
       ];
-      if (state.useGithub) {
+      if (state.useGithub && state.githubBackfill) {
         lines.push("");
-        lines.push("# GitHub");
+        lines.push("# GitHub backfill");
         lines.push(`curl -X POST -H "${authHeader}" \\`);
         lines.push('  "https://<worker>/sync/github/open-issues?repo=OWNER/REPO"');
       }
-      if (state.useAzure) {
+      if (state.useAzure && state.azureBackfill) {
         lines.push("");
-        lines.push("# Azure DevOps (skips Closed / Done / Removed / Completed)");
+        lines.push("# Azure DevOps backfill (skips Closed / Done / Removed / Completed)");
         lines.push(`curl -X POST -H "${authHeader}" \\`);
         lines.push('  "https://<worker>/sync/azure-devops/open-workitems"');
         lines.push(`curl -X POST -H "${authHeader}" \\`);
@@ -1504,7 +1564,9 @@ Resource details to send: All`)}
           useGithub: state.useGithub,
           useAzure: state.useAzure,
           sharedList: state.sharedList,
+          githubBackfill: state.githubBackfill,
           privateGithub: state.privateGithub,
+          azureBackfill: state.azureBackfill,
         },
         keys,
         generated: {
@@ -1569,8 +1631,10 @@ Resource details to send: All`)}
     <strong>What you chose</strong>
     <ul>
       <li>GitHub sync: ${state.useGithub ? "enabled" : "disabled"}</li>
+      <li>GitHub backfill: ${state.useGithub ? (state.githubBackfill ? "enabled" : "disabled") : "n/a"}</li>
+      <li>Private GitHub backfill PAT needed: ${state.useGithub && state.githubBackfill && state.privateGithub ? "yes" : "no"}</li>
       <li>Azure DevOps sync: ${state.useAzure ? "enabled" : "disabled"}</li>
-      <li>Private GitHub backfill PAT needed: ${state.privateGithub ? "yes" : "no"}</li>
+      <li>Azure DevOps backfill: ${state.useAzure ? (state.azureBackfill ? "enabled (skips Closed)" : "disabled") : "n/a"}</li>
       <li>TickTick list routing: ${escapeHtml(listMode)}</li>
       <li>List guidance: ${escapeHtml(payload.generated.listGuidance || "")}</li>
     </ul>
@@ -1650,7 +1714,16 @@ Resource details to send: All`)}
       state.useGithub = Boolean(selections.useGithub);
       state.useAzure = Boolean(selections.useAzure);
       state.sharedList = Boolean(selections.sharedList);
+      // Older exports only had privateGithub; default backfill on when the source is enabled.
+      state.githubBackfill =
+        typeof selections.githubBackfill === "boolean"
+          ? selections.githubBackfill
+          : state.useGithub;
       state.privateGithub = Boolean(selections.privateGithub);
+      state.azureBackfill =
+        typeof selections.azureBackfill === "boolean"
+          ? selections.azureBackfill
+          : state.useAzure;
 
       const importedKeys =
         payload.keys && typeof payload.keys === "object" ? payload.keys : {};
@@ -1665,7 +1738,9 @@ Resource details to send: All`)}
       els.useGithub.checked = state.useGithub;
       els.useAzure.checked = state.useAzure;
       els.sharedList.checked = state.sharedList;
+      els.githubBackfill.checked = state.githubBackfill;
       els.privateGithub.checked = state.privateGithub;
+      els.azureBackfill.checked = state.azureBackfill;
       render();
     }
 
@@ -1724,6 +1799,9 @@ Resource details to send: All`)}
       els.secretCount.textContent = String(secrets);
       els.varCount.textContent = String(vars);
       els.sourceWarning.classList.toggle("hidden", enabled > 0);
+      els.githubBackfillGroup.classList.toggle("hidden", !state.useGithub);
+      els.azureBackfillGroup.classList.toggle("hidden", !state.useAzure);
+      els.privateGithub.disabled = !state.githubBackfill;
     }
 
     function bindCopies() {
@@ -1759,11 +1837,16 @@ Resource details to send: All`)}
       state.useGithub = els.useGithub.checked;
       state.useAzure = els.useAzure.checked;
       state.sharedList = els.sharedList.checked;
-      state.privateGithub = els.privateGithub.checked;
+      state.githubBackfill = els.githubBackfill.checked;
+      state.privateGithub = els.privateGithub.checked && state.githubBackfill;
+      state.azureBackfill = els.azureBackfill.checked;
+      if (!state.githubBackfill && els.privateGithub.checked) {
+        els.privateGithub.checked = false;
+      }
       render();
     }
 
-    [els.useGithub, els.useAzure, els.sharedList, els.privateGithub].forEach((input) => {
+    [els.useGithub, els.useAzure, els.sharedList, els.githubBackfill, els.privateGithub, els.azureBackfill].forEach((input) => {
       input.addEventListener("change", syncState);
     });
 
