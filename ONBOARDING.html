@@ -431,8 +431,43 @@
       gap: 8px;
     }
 
-    .step-complete-toggle {
-      margin-top: 14px;
+    .step-done-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel-strong) 72%, transparent);
+    }
+
+    .step-done-bar[data-done="true"] {
+      border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+      background: color-mix(in srgb, var(--success) 10%, var(--panel-strong));
+    }
+
+    .step-done-bar .step-done-copy {
+      flex: 1 1 200px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .step-done-bar .step-done-copy strong {
+      display: block;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .step-done-btn {
+      flex: 0 0 auto;
+    }
+
+    .step-done-btn[data-done="true"] {
+      border-color: color-mix(in srgb, var(--success) 40%, var(--border));
     }
 
     .section-stack {
@@ -923,13 +958,13 @@ curl http://localhost:8787/health</pre>
               <p id="list-guidance" class="footer-note"></p>
             </li>
           </div>
-          <label class="toggle step-complete-toggle">
-            <input id="doneLocal" type="checkbox" />
-            <span>
-              <strong>Mark Step 6 complete</strong>
-              Check this after local install, OAuth, and <code>/debug/projects</code> work.
-            </span>
-          </label>
+          <div class="step-done-bar" data-step-done="local">
+            <div class="step-done-copy">
+              <strong>Finished local setup?</strong>
+              Click when install, OAuth, and <code>/debug/projects</code> all work.
+            </div>
+            <button class="action-btn primary step-done-btn" type="button" data-step-done-toggle="local">I've done this</button>
+          </div>
         </section>
 
         <section class="panel" id="keys-lists">
@@ -968,13 +1003,13 @@ npm run deploy</pre>
               <ul class="compact-list" id="prodOauthSteps"></ul>
             </li>
           </div>
-          <label class="toggle step-complete-toggle">
-            <input id="doneDeploy" type="checkbox" />
-            <span>
-              <strong>Mark Step 8 complete</strong>
-              Check this after remote migrate, deploy, and production TickTick OAuth succeed.
-            </span>
-          </label>
+          <div class="step-done-bar" data-step-done="deploy">
+            <div class="step-done-copy">
+              <strong>Finished production deploy?</strong>
+              Click when remote migrate, deploy, and production TickTick OAuth succeed.
+            </div>
+            <button class="action-btn primary step-done-btn" type="button" data-step-done-toggle="deploy">I've done this</button>
+          </div>
         </section>
 
         <section class="panel" id="github">
@@ -982,13 +1017,13 @@ npm run deploy</pre>
           <h2>GitHub webhook setup</h2>
           <p class="footer-note" style="margin-top:0;">Use the secrets and Worker URL from earlier steps. This section is only about wiring GitHub to the deployed Worker.</p>
           <div id="githubContent"></div>
-          <label class="toggle step-complete-toggle" id="doneGithubWrap">
-            <input id="doneGithub" type="checkbox" />
-            <span>
-              <strong>Mark GitHub setup complete</strong>
-              Check this after the webhook is configured and optional backfill has been run.
-            </span>
-          </label>
+          <div class="step-done-bar" id="doneGithubWrap" data-step-done="github">
+            <div class="step-done-copy">
+              <strong>Finished GitHub setup?</strong>
+              Click when the webhook is configured and optional backfill has been run.
+            </div>
+            <button class="action-btn primary step-done-btn" type="button" data-step-done-toggle="github">I've done this</button>
+          </div>
         </section>
 
         <section class="panel" id="azure">
@@ -996,13 +1031,13 @@ npm run deploy</pre>
           <h2>Azure DevOps Service Hook setup</h2>
           <p class="footer-note" style="margin-top:0;">Use the secrets, org/project values, and Worker URL from earlier steps. This section wires Azure DevOps to the deployed Worker.</p>
           <div id="azureContent"></div>
-          <label class="toggle step-complete-toggle" id="doneAzureWrap">
-            <input id="doneAzure" type="checkbox" />
-            <span>
-              <strong>Mark Azure DevOps setup complete</strong>
-              Check this after Service Hooks are configured and optional backfill has been run.
-            </span>
-          </label>
+          <div class="step-done-bar" id="doneAzureWrap" data-step-done="azure">
+            <div class="step-done-copy">
+              <strong>Finished Azure DevOps setup?</strong>
+              Click when Service Hooks are configured and optional backfill has been run.
+            </div>
+            <button class="action-btn primary step-done-btn" type="button" data-step-done-toggle="azure">I've done this</button>
+          </div>
         </section>
 
         <section class="panel" id="verify">
@@ -1285,10 +1320,6 @@ npm run deploy</pre>
       keysListsSection: document.getElementById("keys-lists"),
       githubSection: document.getElementById("github"),
       azureSection: document.getElementById("azure"),
-      doneLocal: document.getElementById("doneLocal"),
-      doneDeploy: document.getElementById("doneDeploy"),
-      doneGithub: document.getElementById("doneGithub"),
-      doneAzure: document.getElementById("doneAzure"),
       doneGithubWrap: document.getElementById("doneGithubWrap"),
       doneAzureWrap: document.getElementById("doneAzureWrap"),
       navList: document.getElementById("navList"),
@@ -1512,10 +1543,21 @@ npm run deploy</pre>
       els.azureSection.classList.toggle("hidden", !state.useAzure);
       els.doneGithubWrap.classList.toggle("hidden", !state.useGithub);
       els.doneAzureWrap.classList.toggle("hidden", !state.useAzure);
-      els.doneLocal.checked = state.done.local;
-      els.doneDeploy.checked = state.done.deploy;
-      els.doneGithub.checked = state.done.github;
-      els.doneAzure.checked = state.done.azure;
+      syncStepDoneButtons();
+    }
+
+    function syncStepDoneButtons() {
+      document.querySelectorAll("[data-step-done]").forEach((bar) => {
+        const key = bar.getAttribute("data-step-done");
+        if (!key || !(key in state.done)) return;
+        const done = Boolean(state.done[key]);
+        bar.dataset.done = done ? "true" : "false";
+        const button = bar.querySelector("[data-step-done-toggle]");
+        if (!button) return;
+        button.dataset.done = done ? "true" : "false";
+        button.textContent = done ? "Undo — mark incomplete" : "I've done this";
+        button.classList.toggle("primary", !done);
+      });
     }
 
     function escapeJsonString(value) {
@@ -2188,10 +2230,6 @@ Resource details to send: All`)}
       els.privateGithub.checked = state.privateGithub;
       els.azureBackfill.checked = state.azureBackfill;
       els.workerHost.value = state.workerHost;
-      els.doneLocal.checked = state.done.local;
-      els.doneDeploy.checked = state.done.deploy;
-      els.doneGithub.checked = state.done.github;
-      els.doneAzure.checked = state.done.azure;
       render();
     }
 
@@ -2293,10 +2331,6 @@ Resource details to send: All`)}
       state.privateGithub = els.privateGithub.checked && state.githubBackfill;
       state.azureBackfill = els.azureBackfill.checked;
       state.workerHost = els.workerHost.value;
-      state.done.local = els.doneLocal.checked;
-      state.done.deploy = els.doneDeploy.checked;
-      state.done.github = els.doneGithub.checked;
-      state.done.azure = els.doneAzure.checked;
       if (!state.githubBackfill && els.privateGithub.checked) {
         els.privateGithub.checked = false;
       }
@@ -2305,8 +2339,17 @@ Resource details to send: All`)}
       render();
     }
 
-    [els.useGithub, els.useAzure, els.sharedList, els.githubBackfill, els.privateGithub, els.azureBackfill, els.doneLocal, els.doneDeploy, els.doneGithub, els.doneAzure].forEach((input) => {
+    [els.useGithub, els.useAzure, els.sharedList, els.githubBackfill, els.privateGithub, els.azureBackfill].forEach((input) => {
       input.addEventListener("change", syncState);
+    });
+
+    document.querySelectorAll("[data-step-done-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const key = button.getAttribute("data-step-done-toggle");
+        if (!key || !(key in state.done)) return;
+        state.done[key] = !state.done[key];
+        render();
+      });
     });
 
     els.workerHost.addEventListener("input", () => {
