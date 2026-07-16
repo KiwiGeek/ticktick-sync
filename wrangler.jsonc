@@ -28,7 +28,7 @@
 		"AZURE_DEVOPS_ORG": "YOUR_ORG",
 		"AZURE_DEVOPS_PROJECT": "YOUR_PROJECT",
 		"AZURE_DEVOPS_TEAM": "YOUR_TEAM",
-		"AZURE_DEVOPS_WORK_ITEM_TYPES": "Task,Bug"
+		"AZURE_DEVOPS_WORK_ITEM_TYPES": "Bug,Task,User Story,Product Backlog Item,Issue"
 	}
 	/**
 	 * Smart Placement

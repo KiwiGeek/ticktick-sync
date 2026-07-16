@@ -53,7 +53,9 @@ GitHub and Azure DevOps can target **different TickTick lists**.
 - `POST /webhooks/azure-devops`
 - `GET /debug/projects`
 - `POST /sync/github/open-issues?repo=owner/repo`
-- `POST /sync/azure-devops/taskboard`
+- `POST /sync/azure-devops/open-workitems` backfill open Kanban/backlog items (skips Closed)
+- `POST /sync/azure-devops/open-workitems?team=TeamName` optional team override
+- `POST /sync/azure-devops/taskboard` current-sprint Taskboard backfill (also skips Closed)
 - `POST /sync/azure-devops/taskboard?team=TeamName` optional team override
 
 ## Architecture
@@ -220,9 +222,10 @@ Then:
 
 ### Azure DevOps
 
-- Targets the team's **current iteration**
-- Prefers the Taskboard Work Items API, then falls back to WIQL
-- Imports unfulfilled configured work item types (`Done` / `Closed` / `Removed` / `Completed` skipped)
+- `POST /sync/azure-devops/open-workitems` backfills open Kanban / backlog board items
+- `POST /sync/azure-devops/taskboard` backfills the team's current-sprint Taskboard
+- Both intentionally skip `Closed` / `Done` / `Removed` / `Completed` states (and matching board columns)
+- Work item types come from `AZURE_DEVOPS_WORK_ITEM_TYPES` (default includes Bug, Task, User Story, Product Backlog Item, Issue)
 - Existing mapped work items are updated, not duplicated
 - Requires `AZURE_DEVOPS_PAT` with Work Items Read
 

@@ -478,11 +478,6 @@
     }
 
     @media print {
-      .waifu-corner,
-      .waifu-credit {
-        display: none !important;
-      }
-
       body.printing-recreation {
         background: white !important;
       }
@@ -564,8 +559,8 @@
                 <label class="toggle">
                   <input id="useAzure" type="checkbox" checked />
                   <span>
-                    <strong>Enable Azure DevOps Taskboard sync</strong>
-                    Configure Service Hooks and current-sprint Taskboard backfill.
+                    <strong>Enable Azure DevOps board sync</strong>
+                    Configure Service Hooks and backfill open board items (skips Closed).
                   </span>
                 </label>
               </div>
@@ -855,23 +850,6 @@ npm run deploy</pre>
 
   <div class="print-sheet" id="printSheet" aria-hidden="true"></div>
 
-  <div class="waifu-corner" aria-hidden="true">
-    <img
-      src="https://upload.wikimedia.org/wikipedia/commons/9/98/Magicgirl.svg"
-      alt=""
-      loading="lazy"
-    />
-  </div>
-  <a
-    class="waifu-credit"
-    href="https://commons.wikimedia.org/wiki/File:Magicgirl.svg"
-    target="_blank"
-    rel="noopener noreferrer"
-    title="CC0 public domain anime girl from Open Clip Art Library / Wikimedia Commons"
-  >
-    CC0 waifu
-  </a>
-
   <script>
     const state = {
       useGithub: true,
@@ -984,8 +962,8 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_WORK_ITEM_TYPES",
         group: "azure",
         kind: "var",
-        hint: "Comma-separated types to sync.",
-        placeholder: "Task,Bug",
+        hint: "Comma-separated types to sync (Closed/Done skipped).",
+        placeholder: "Bug,Task,User Story,Product Backlog Item,Issue",
       },
     ];
 
@@ -1139,8 +1117,8 @@ npm run deploy</pre>
               <tr><td><code>AZURE_DEVOPS_TICKTICK_PROJECT_ID</code></td><td>Var</td><td>TickTick list for Azure DevOps items</td><td>Use <code>/debug/projects</code> after TickTick OAuth</td></tr>
               <tr><td><code>AZURE_DEVOPS_ORG</code></td><td>Var</td><td>Azure DevOps organization</td><td>From the <code>dev.azure.com/&lt;org&gt;</code> URL segment</td></tr>
               <tr><td><code>AZURE_DEVOPS_PROJECT</code></td><td>Var</td><td>Azure DevOps project</td><td>From the board/project URL</td></tr>
-              <tr><td><code>AZURE_DEVOPS_TEAM</code></td><td>Var</td><td>Current sprint team</td><td>From the Taskboard URL; optional but recommended</td></tr>
-              <tr><td><code>AZURE_DEVOPS_WORK_ITEM_TYPES</code></td><td>Var</td><td>Work item types to sync</td><td>Usually <code>Task,Bug</code></td></tr>
+              <tr><td><code>AZURE_DEVOPS_TEAM</code></td><td>Var</td><td>Team (Taskboard / sprint); optional for Kanban open-workitems</td><td>From the board URL; defaults to project name</td></tr>
+              <tr><td><code>AZURE_DEVOPS_WORK_ITEM_TYPES</code></td><td>Var</td><td>Work item types to sync</td><td>Default: Bug,Task,User Story,Product Backlog Item,Issue</td></tr>
             </tbody>
           </table>
         `);
@@ -1156,7 +1134,7 @@ npm run deploy</pre>
         items.push(listItem("GitHub enabled", state.privateGithub ? "Create webhook secret and a PAT for private backfill." : "Create webhook secret; PAT optional."));
       }
       if (state.useAzure) {
-        items.push(listItem("Azure DevOps enabled", "Create PAT, Service Hook credentials, and org/project/team vars."));
+        items.push(listItem("Azure DevOps enabled", "Create PAT, Service Hook credentials, and org/project vars. Backfill skips Closed."));
       }
       items.push(listItem("TickTick list mode", state.sharedList ? "Use one shared TickTick list for all enabled sources." : "Use separate TickTick lists per source."));
       els.planSummary.innerHTML = items.join("");
@@ -1231,7 +1209,7 @@ npm run deploy</pre>
           `  "AZURE_DEVOPS_TEAM": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_TEAM", "your-team"))}",`,
         );
         vars.push(
-          `  "AZURE_DEVOPS_WORK_ITEM_TYPES": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_WORK_ITEM_TYPES", "Task,Bug"))}",`,
+          `  "AZURE_DEVOPS_WORK_ITEM_TYPES": "${escapeJsonString(keyOrPlaceholder("AZURE_DEVOPS_WORK_ITEM_TYPES", "Bug,Task,User Story,Product Backlog Item,Issue"))}",`,
         );
       }
       if (!state.useGithub && !state.useAzure) {
@@ -1362,17 +1340,25 @@ Basic auth password: AZURE_DEVOPS_WEBHOOK_SECRET
 Resource details to send: All`)}
           </li>
           <li>
-            <strong>Backfill current sprint Taskboard items</strong>
-            ${codeBlock("azure-backfill", `curl -X POST \\
+            <strong>Backfill open board items (skips Closed)</strong>
+            <p>Use this for Kanban / backlog boards. Items already in the <strong>Closed</strong> column (or Done / Removed / Completed) are intentionally excluded.</p>
+            ${codeBlock("azure-backfill-open", `curl -X POST \\
+  -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
+  "https://<your-worker>.workers.dev/sync/azure-devops/open-workitems"`)}
+          </li>
+          <li>
+            <strong>Optional: current-sprint Taskboard only</strong>
+            ${codeBlock("azure-backfill-taskboard", `curl -X POST \\
   -H "Authorization: Bearer ${keyOrPlaceholder("DEBUG_TOKEN", "YOUR_DEBUG_TOKEN")}" \\
   "https://<your-worker>.workers.dev/sync/azure-devops/taskboard"`)}
           </li>
           <li>
             <strong>Expected behavior</strong>
             <ul class="compact-list">
-              <li>Unfulfilled Task/Bug created on the current Taskboard → TickTick task created in the Azure DevOps list</li>
-              <li>Title/state updated while still unfulfilled → task updated</li>
+              <li>Open backlog / board item (not Closed) → TickTick task created in the Azure DevOps list</li>
+              <li>Title/state updated while still open → task updated</li>
               <li>Moved to Done / Closed / Completed / Removed → task completed</li>
+              <li>Already-Closed items are never imported by backfill</li>
               <li>Reopened → fresh TickTick task created</li>
             </ul>
           </li>
@@ -1396,7 +1382,7 @@ Resource details to send: All`)}
         parts.push("<li><strong>GitHub</strong> Open, edit, close, and reopen a test issue and watch the TickTick task follow it.</li>");
       }
       if (state.useAzure) {
-        parts.push("<li><strong>Azure DevOps</strong> Create or update a Task/Bug on the current sprint Taskboard and confirm the TickTick task updates correctly.</li>");
+        parts.push("<li><strong>Azure DevOps</strong> Backfill with <code>/sync/azure-devops/open-workitems</code>, confirm Closed-column items were skipped, then create/update an open work item and confirm TickTick updates.</li>");
       }
       parts.push("</ul>");
 
@@ -1418,7 +1404,9 @@ Resource details to send: All`)}
       }
       if (state.useAzure) {
         lines.push("");
-        lines.push("# Azure DevOps");
+        lines.push("# Azure DevOps (skips Closed / Done / Removed / Completed)");
+        lines.push(`curl -X POST -H "${authHeader}" \\`);
+        lines.push('  "https://<worker>/sync/azure-devops/open-workitems"');
         lines.push(`curl -X POST -H "${authHeader}" \\`);
         lines.push('  "https://<worker>/sync/azure-devops/taskboard"');
       }

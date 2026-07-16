@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
 import {
+	listOpenBoardWorkItems,
 	listUnfulfilledTaskboardWorkItems,
 	toSyncableFromWebhook,
 	toSyncableFromWorkItem,
@@ -461,6 +462,46 @@ app.post("/sync/github/open-issues", async (c) => {
 	}
 });
 
+app.post("/sync/azure-devops/open-workitems", async (c) => {
+	const authError = requireDebugToken(c.req.raw, c.env);
+	if (authError) {
+		return authError;
+	}
+
+	const team = c.req.query("team")?.trim();
+
+	try {
+		const { workItems, team: resolvedTeam, source, excludedStates } =
+			await listOpenBoardWorkItems(c.env, { team });
+		const actionCounts = emptyActionCounts();
+
+		for (const workItem of workItems) {
+			const syncable = toSyncableFromWorkItem(c.env, workItem, "opened");
+			const result = await syncAzureWorkItemToTickTick(c.env, syncable);
+			actionCounts[result.action] += 1;
+		}
+
+		return c.json({
+			ok: true,
+			org: c.env.AZURE_DEVOPS_ORG,
+			project: c.env.AZURE_DEVOPS_PROJECT,
+			team: resolvedTeam,
+			source,
+			excludedStates,
+			note: "Closed / Done / Removed / Completed board items are intentionally skipped.",
+			totalWorkItems: workItems.length,
+			actionCounts,
+		});
+	} catch (error) {
+		return jsonError(
+			error instanceof Error
+				? error.message
+				: "Failed to sync open Azure DevOps work items.",
+			502,
+		);
+	}
+});
+
 app.post("/sync/azure-devops/taskboard", async (c) => {
 	const authError = requireDebugToken(c.req.raw, c.env);
 	if (authError) {
@@ -491,6 +532,7 @@ app.post("/sync/azure-devops/taskboard", async (c) => {
 				path: iteration.path,
 			},
 			source,
+			note: "Closed / Done / Removed / Completed items are intentionally skipped.",
 			totalWorkItems: workItems.length,
 			actionCounts,
 		});

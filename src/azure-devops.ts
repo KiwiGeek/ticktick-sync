@@ -9,7 +9,14 @@ import type {
 const ADO_API_VERSION = "7.1";
 const FULFILLED_STATES = new Set(["done", "closed", "removed", "completed"]);
 const FULFILLED_COLUMNS = new Set(["done", "closed", "completed"]);
-const DEFAULT_TASKBOARD_TYPES = ["Task", "Bug"];
+/** Covers Agile / Scrum / Basic process backlog + taskboard item types. */
+const DEFAULT_WORK_ITEM_TYPES = [
+	"Bug",
+	"Task",
+	"User Story",
+	"Product Backlog Item",
+	"Issue",
+];
 
 const timingSafeEqual = (left: string, right: string): boolean => {
 	if (left.length !== right.length) {
@@ -46,10 +53,10 @@ const getTeam = (env: AppBindings, override?: string): string => {
 const getPat = (env: AppBindings): string =>
 	requireConfig(env.AZURE_DEVOPS_PAT, "AZURE_DEVOPS_PAT");
 
-export const getTaskboardWorkItemTypes = (env: AppBindings): string[] => {
+export const getConfiguredWorkItemTypes = (env: AppBindings): string[] => {
 	const configured = env.AZURE_DEVOPS_WORK_ITEM_TYPES?.trim();
 	if (!configured) {
-		return DEFAULT_TASKBOARD_TYPES;
+		return DEFAULT_WORK_ITEM_TYPES;
 	}
 
 	return configured
@@ -57,6 +64,9 @@ export const getTaskboardWorkItemTypes = (env: AppBindings): string[] => {
 		.map((type) => type.trim())
 		.filter((type) => type.length > 0);
 };
+
+/** @deprecated Prefer getConfiguredWorkItemTypes */
+export const getTaskboardWorkItemTypes = getConfiguredWorkItemTypes;
 
 export const isFulfilledState = (state: string | null | undefined): boolean => {
 	if (!state) {
@@ -72,9 +82,18 @@ export const isFulfilledColumn = (column: string | null | undefined): boolean =>
 	return FULFILLED_COLUMNS.has(column.trim().toLowerCase());
 };
 
-export const isTaskboardWorkItemType = (env: AppBindings, workItemType: string): boolean => {
-	const allowed = getTaskboardWorkItemTypes(env).map((type) => type.toLowerCase());
+export const isConfiguredWorkItemType = (env: AppBindings, workItemType: string): boolean => {
+	const allowed = getConfiguredWorkItemTypes(env).map((type) => type.toLowerCase());
 	return allowed.includes(workItemType.trim().toLowerCase());
+};
+
+/** @deprecated Prefer isConfiguredWorkItemType */
+export const isTaskboardWorkItemType = isConfiguredWorkItemType;
+
+export const isOpenWorkItem = (workItem: AzureDevOpsWorkItem): boolean => {
+	const state = fieldString(workItem.fields, "System.State");
+	const boardColumn = fieldString(workItem.fields, "System.BoardColumn");
+	return !isFulfilledState(state) && !isFulfilledColumn(boardColumn);
 };
 
 export const verifyAzureDevOpsBasicAuth = (
@@ -288,24 +307,32 @@ const listTaskboardWorkItemIds = async (
 		.map((item) => item.workItemId);
 };
 
-const listUnfulfilledWorkItemIdsViaWiql = async (
+const listWorkItemIdsViaWiql = async (
 	env: AppBindings,
-	iterationPath: string,
 	team: string,
+	options?: { iterationPath?: string },
 ): Promise<number[]> => {
 	const org = getOrg(env);
 	const project = getProject(env);
-	const types = getTaskboardWorkItemTypes(env)
+	const types = getConfiguredWorkItemTypes(env)
 		.map((type) => `'${escapeWiqlString(type)}'`)
 		.join(", ");
+
+	const clauses = [
+		`[System.TeamProject] = '${escapeWiqlString(project)}'`,
+		`[System.WorkItemType] IN (${types})`,
+		// Explicitly skip closed/fulfilled states (Kanban "Closed" column uses Closed).
+		"[System.State] NOT IN ('Done', 'Closed', 'Removed', 'Completed')",
+	];
+
+	if (options?.iterationPath) {
+		clauses.push(`[System.IterationPath] = '${escapeWiqlString(options.iterationPath)}'`);
+	}
 
 	const query = [
 		"SELECT [System.Id]",
 		"FROM WorkItems",
-		`WHERE [System.TeamProject] = '${escapeWiqlString(project)}'`,
-		`AND [System.WorkItemType] IN (${types})`,
-		"AND [System.State] NOT IN ('Done', 'Closed', 'Removed', 'Completed')",
-		`AND [System.IterationPath] = '${escapeWiqlString(iterationPath)}'`,
+		`WHERE ${clauses.join(" AND ")}`,
 		"ORDER BY [System.Id] ASC",
 	].join(" ");
 
@@ -344,6 +371,7 @@ const getWorkItemsBatch = async (
 		"System.Description",
 		"Microsoft.VSTS.TCM.ReproSteps",
 		"System.TeamProject",
+		"System.BoardColumn",
 	];
 
 	const items: AzureDevOpsWorkItem[] = [];
@@ -376,6 +404,13 @@ export type UnfulfilledTaskboardResult = {
 	iteration: TeamIteration;
 	team: string;
 	source: "taskboard" | "wiql";
+};
+
+export type OpenBoardWorkItemsResult = {
+	workItems: AzureDevOpsWorkItem[];
+	team: string;
+	source: "wiql";
+	excludedStates: string[];
 };
 
 export const getWorkItem = async (
@@ -418,7 +453,7 @@ export const listUnfulfilledTaskboardWorkItems = async (
 	const team = getTeam(env, options?.team);
 	const iteration = await getCurrentIteration(env, team);
 	const allowedTypes = new Set(
-		getTaskboardWorkItemTypes(env).map((type) => type.toLowerCase()),
+		getConfiguredWorkItemTypes(env).map((type) => type.toLowerCase()),
 	);
 
 	let ids: number[] = [];
@@ -428,20 +463,41 @@ export const listUnfulfilledTaskboardWorkItems = async (
 		ids = await listTaskboardWorkItemIds(env, iteration.id, team);
 	} catch {
 		source = "wiql";
-		ids = await listUnfulfilledWorkItemIdsViaWiql(env, iteration.path, team);
-	}
-
-	if (ids.length === 0 && source === "taskboard") {
-		// Taskboard API can succeed with an empty board; still fine.
+		ids = await listWorkItemIdsViaWiql(env, team, { iterationPath: iteration.path });
 	}
 
 	const workItems = (await getWorkItemsBatch(env, ids)).filter((item) => {
 		const type = fieldString(item.fields, "System.WorkItemType") ?? "";
-		const state = fieldString(item.fields, "System.State");
-		return allowedTypes.has(type.toLowerCase()) && !isFulfilledState(state);
+		return allowedTypes.has(type.toLowerCase()) && isOpenWorkItem(item);
 	});
 
 	return { workItems, iteration, team, source };
+};
+
+/**
+ * Backfill open Kanban / backlog board items for the project.
+ * Intentionally skips Closed / Done / Removed / Completed states and board columns.
+ */
+export const listOpenBoardWorkItems = async (
+	env: AppBindings,
+	options?: { team?: string },
+): Promise<OpenBoardWorkItemsResult> => {
+	const team = getTeam(env, options?.team);
+	const allowedTypes = new Set(
+		getConfiguredWorkItemTypes(env).map((type) => type.toLowerCase()),
+	);
+	const ids = await listWorkItemIdsViaWiql(env, team);
+	const workItems = (await getWorkItemsBatch(env, ids)).filter((item) => {
+		const type = fieldString(item.fields, "System.WorkItemType") ?? "";
+		return allowedTypes.has(type.toLowerCase()) && isOpenWorkItem(item);
+	});
+
+	return {
+		workItems,
+		team,
+		source: "wiql",
+		excludedStates: [...FULFILLED_STATES],
+	};
 };
 
 export type SyncableWorkItemAction = "opened" | "edited" | "closed" | "reopened";
