@@ -1,12 +1,14 @@
 # TickTick Sync Worker
 
-Cloudflare Workers service built with TypeScript, Hono, and D1 that syncs GitHub issues and Azure DevOps Taskboard work items into TickTick tasks.
+Cloudflare Workers service built with TypeScript, Hono, and D1 that syncs GitHub issues and/or Azure DevOps Taskboard work items into TickTick tasks.
 
 **New here?** Follow the full setup guide: [ONBOARDING.md](./ONBOARDING.md)
 
+GitHub and Azure DevOps are **independent optional sources** — enable either one, or both.
+
 ## Overview
 
-This Worker mirrors work from source trackers into TickTick lists.
+This Worker mirrors work from optional source trackers into TickTick lists.
 
 ### GitHub issues
 
@@ -145,13 +147,25 @@ Example:
 
 ### Secrets (Wrangler / `.dev.vars`)
 
+Always required:
+
 | Secret | Purpose |
 |--------|---------|
 | `TICKTICK_CLIENT_ID` | TickTick OAuth client id |
 | `TICKTICK_CLIENT_SECRET` | TickTick OAuth client secret |
 | `DEBUG_TOKEN` | Bearer token for debug/backfill endpoints |
+
+Only if using GitHub:
+
+| Secret | Purpose |
+|--------|---------|
 | `GITHUB_WEBHOOK_SECRET` | GitHub webhook HMAC secret |
 | `GITHUB_TOKEN` | Optional GitHub PAT for private backfill / rate limits |
+
+Only if using Azure DevOps:
+
+| Secret | Purpose |
+|--------|---------|
 | `AZURE_DEVOPS_PAT` | Azure DevOps PAT (Work Items Read) |
 | `AZURE_DEVOPS_WEBHOOK_USERNAME` | Service Hook basic-auth username |
 | `AZURE_DEVOPS_WEBHOOK_SECRET` | Service Hook basic-auth password |

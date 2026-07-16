@@ -1,60 +1,96 @@
 # Onboarding: Deploy TickTick Sync
 
-This guide walks through a full setup of the TickTick Sync Worker — from collecting credentials to verifying GitHub and Azure DevOps sync in production.
+This guide walks through a full setup of the TickTick Sync Worker — from collecting credentials to verifying sync in production.
 
 For architecture and endpoint reference, see [README.md](./README.md).
+
+## Choose your sources
+
+GitHub and Azure DevOps are **both optional**. Enable whichever you need:
+
+| Mode | What to configure |
+|------|-------------------|
+| GitHub only | TickTick + GitHub sections |
+| Azure DevOps only | TickTick + Azure DevOps sections |
+| Both | Everything |
+
+Skip any section marked for a source you are not using.
+
+---
 
 ## What you are building
 
 A Cloudflare Worker that:
 
-1. Receives GitHub issue webhooks and Azure DevOps work-item Service Hooks
+1. Optionally receives GitHub issue webhooks and/or Azure DevOps work-item Service Hooks
 2. Creates / updates / completes tasks in TickTick
 3. Stores OAuth tokens and source↔TickTick mappings in Cloudflare D1
 
-Sync is **one-way only** (GitHub / Azure DevOps → TickTick).
+Sync is **one-way only** (sources → TickTick).
 
-You can send GitHub and Azure DevOps items into **different TickTick lists**.
+If you enable both sources, they can target **different TickTick lists**.
 
 ---
 
 ## Prerequisites
 
+Always required:
+
 - Node.js 20+
 - npm
 - A Cloudflare account
 - A TickTick account
-- Access to the GitHub repos you want to sync
-- Access to the Azure DevOps org/project/team (if using Azure DevOps)
 - `wrangler` login access (`npx wrangler login`)
+
+Only if using GitHub:
+
+- Access to the GitHub repos you want to sync
+
+Only if using Azure DevOps:
+
+- Access to the Azure DevOps org/project/team you want to sync
 
 ---
 
 ## Credential checklist
 
-Collect these before deploying. Details for each are below.
+### Always required
 
-| Name | Type | Required | Used for |
-|------|------|----------|----------|
-| `TICKTICK_CLIENT_ID` | secret | Yes | TickTick OAuth |
-| `TICKTICK_CLIENT_SECRET` | secret | Yes | TickTick OAuth |
-| `DEBUG_TOKEN` | secret | Yes | Protecting debug/backfill endpoints |
-| `GITHUB_WEBHOOK_SECRET` | secret | Yes (if using GitHub) | Verifying GitHub webhooks |
-| `GITHUB_TOKEN` | secret | Optional | Private-repo backfill / higher GitHub rate limits |
-| `AZURE_DEVOPS_PAT` | secret | Yes (if using Azure DevOps) | Reading work items / Taskboard |
-| `AZURE_DEVOPS_WEBHOOK_USERNAME` | secret | Recommended | Service Hook basic auth username |
-| `AZURE_DEVOPS_WEBHOOK_SECRET` | secret | Yes (if using Azure DevOps webhooks) | Service Hook basic auth password |
-| `GITHUB_TICKTICK_PROJECT_ID` | var | Yes (if using GitHub) | TickTick list for GitHub issues |
-| `AZURE_DEVOPS_TICKTICK_PROJECT_ID` | var | Yes (if using Azure DevOps) | TickTick list for ADO work items |
-| `GITHUB_LOGIN` | var | Optional | Informational |
-| `AZURE_DEVOPS_ORG` | var | Yes (if using Azure DevOps) | ADO organization name |
-| `AZURE_DEVOPS_PROJECT` | var | Yes (if using Azure DevOps) | ADO project name |
-| `AZURE_DEVOPS_TEAM` | var | Recommended | Team for current sprint / Taskboard |
-| `AZURE_DEVOPS_WORK_ITEM_TYPES` | var | Optional | Default `Task,Bug` |
+| Name | Type | Used for |
+|------|------|----------|
+| `TICKTICK_CLIENT_ID` | secret | TickTick OAuth |
+| `TICKTICK_CLIENT_SECRET` | secret | TickTick OAuth |
+| `DEBUG_TOKEN` | secret | Protecting debug/backfill endpoints |
+
+### Only if using GitHub
+
+| Name | Type | Used for |
+|------|------|----------|
+| `GITHUB_WEBHOOK_SECRET` | secret | Verifying GitHub webhooks |
+| `GITHUB_TICKTICK_PROJECT_ID` | var | TickTick list for GitHub issues |
+| `GITHUB_TOKEN` | secret | Optional: private-repo backfill / higher rate limits |
+| `GITHUB_LOGIN` | var | Optional: informational |
+
+### Only if using Azure DevOps
+
+| Name | Type | Used for |
+|------|------|----------|
+| `AZURE_DEVOPS_PAT` | secret | Reading work items / Taskboard |
+| `AZURE_DEVOPS_WEBHOOK_SECRET` | secret | Service Hook basic-auth password |
+| `AZURE_DEVOPS_WEBHOOK_USERNAME` | secret | Recommended basic-auth username |
+| `AZURE_DEVOPS_TICKTICK_PROJECT_ID` | var | TickTick list for ADO work items |
+| `AZURE_DEVOPS_ORG` | var | ADO organization name |
+| `AZURE_DEVOPS_PROJECT` | var | ADO project name |
+| `AZURE_DEVOPS_TEAM` | var | Recommended: team for current sprint / Taskboard |
+| `AZURE_DEVOPS_WORK_ITEM_TYPES` | var | Optional: default `Task,Bug` |
+
+Details for each credential are below.
 
 ---
 
 ## 1. Create the TickTick developer app
+
+Required for every deployment.
 
 1. Go to the [TickTick Developer](https://developer.ticktick.com/) portal and sign in.
 2. Create an application / OAuth client.
@@ -81,24 +117,27 @@ You can register both URIs on the same TickTick app.
 
 ## 2. Choose (or create) TickTick lists
 
-You will need one list for GitHub and, optionally, a different list for Azure DevOps.
+Create one TickTick list per source you plan to enable.
 
-You do **not** need the list IDs yet. After OAuth works, the Worker can list them for you via `/debug/projects`.
+| If you enable… | Create a list for… | Later set… |
+|----------------|--------------------|------------|
+| GitHub | GitHub issues | `GITHUB_TICKTICK_PROJECT_ID` |
+| Azure DevOps | ADO Taskboard items | `AZURE_DEVOPS_TICKTICK_PROJECT_ID` |
+| Both | Either one shared list, or two separate lists | both vars above |
 
-Suggested setup:
-
-- List A: e.g. `GitHub Inbox` → later becomes `GITHUB_TICKTICK_PROJECT_ID`
-- List B: e.g. `Azure DevOps Sprint` → later becomes `AZURE_DEVOPS_TICKTICK_PROJECT_ID`
+You do **not** need the list IDs yet. After OAuth works, the Worker can list them via `/debug/projects`.
 
 ---
 
 ## 3. Create a DEBUG_TOKEN
 
+Required for every deployment.
+
 This is a shared secret you invent. It gates:
 
 - `GET /debug/projects`
-- `POST /sync/github/open-issues`
-- `POST /sync/azure-devops/taskboard`
+- `POST /sync/github/open-issues` (GitHub only)
+- `POST /sync/azure-devops/taskboard` (Azure DevOps only)
 
 Generate something long and random, for example:
 
@@ -110,7 +149,9 @@ Save it as `DEBUG_TOKEN`.
 
 ---
 
-## 4. GitHub credentials
+## 4. GitHub credentials (optional)
+
+Skip this entire section if you are not syncing GitHub.
 
 ### 4a. Webhook secret
 
@@ -129,9 +170,9 @@ Needed only if you want to backfill **private** repos or avoid unauthenticated r
 
 ---
 
-## 5. Azure DevOps credentials
+## 5. Azure DevOps credentials (optional)
 
-Skip this section if you are only syncing GitHub.
+Skip this entire section if you are not syncing Azure DevOps.
 
 ### 5a. Organization / project / team
 
@@ -183,15 +224,20 @@ npm install
 cp .dev.vars.example .dev.vars
 ```
 
-Edit `.dev.vars`:
+Start with the always-required secrets, then add only the sources you use:
 
 ```dotenv
+# Always required
 TICKTICK_CLIENT_ID=...
 TICKTICK_CLIENT_SECRET=...
-GITHUB_WEBHOOK_SECRET=...
 DEBUG_TOKEN=...
-GITHUB_TOKEN=...                          # optional
-AZURE_DEVOPS_PAT=...                      # if using ADO
+
+# Only if using GitHub
+GITHUB_WEBHOOK_SECRET=...
+GITHUB_TOKEN=...                          # optional even when using GitHub
+
+# Only if using Azure DevOps
+AZURE_DEVOPS_PAT=...
 AZURE_DEVOPS_WEBHOOK_USERNAME=ticktick-sync
 AZURE_DEVOPS_WEBHOOK_SECRET=...
 ```
@@ -200,7 +246,30 @@ Never commit `.dev.vars`.
 
 ### 6c. Non-secret vars
 
-Edit `wrangler.jsonc` `vars`:
+Edit `wrangler.jsonc` `vars` for the sources you enabled.
+
+Azure DevOps only example:
+
+```jsonc
+"vars": {
+  "AZURE_DEVOPS_TICKTICK_PROJECT_ID": "YOUR_AZURE_DEVOPS_TICKTICK_LIST_ID",
+  "AZURE_DEVOPS_ORG": "your-org",
+  "AZURE_DEVOPS_PROJECT": "your-project",
+  "AZURE_DEVOPS_TEAM": "your-team",
+  "AZURE_DEVOPS_WORK_ITEM_TYPES": "Task,Bug"
+}
+```
+
+GitHub only example:
+
+```jsonc
+"vars": {
+  "GITHUB_TICKTICK_PROJECT_ID": "YOUR_GITHUB_TICKTICK_LIST_ID",
+  "GITHUB_LOGIN": "your-github-username"
+}
+```
+
+Both sources example:
 
 ```jsonc
 "vars": {
@@ -214,7 +283,7 @@ Edit `wrangler.jsonc` `vars`:
 }
 ```
 
-You can leave the TickTick list IDs as placeholders until after OAuth.
+You can leave TickTick list IDs as placeholders until after OAuth.
 
 ### 6d. Migrate local D1 and generate types
 
@@ -249,16 +318,18 @@ curl -H "Authorization: Bearer YOUR_DEBUG_TOKEN" \
   http://localhost:8787/debug/projects
 ```
 
-Copy the `id` for each list into `wrangler.jsonc`:
+Copy the `id` for each list you are using into `wrangler.jsonc`:
 
-- GitHub list → `GITHUB_TICKTICK_PROJECT_ID`
-- Azure DevOps list → `AZURE_DEVOPS_TICKTICK_PROJECT_ID`
+- GitHub (if enabled) → `GITHUB_TICKTICK_PROJECT_ID`
+- Azure DevOps (if enabled) → `AZURE_DEVOPS_TICKTICK_PROJECT_ID`
 
 Restart `npm run dev` after changing vars.
 
 ### 6h. Local backfill smoke tests
 
-GitHub:
+Run only the backfill(s) for sources you enabled.
+
+GitHub (optional):
 
 ```bash
 curl -X POST \
@@ -266,7 +337,7 @@ curl -X POST \
   "http://localhost:8787/sync/github/open-issues?repo=OWNER/REPO"
 ```
 
-Azure DevOps Taskboard (current sprint, unfulfilled Task/Bug):
+Azure DevOps Taskboard (optional):
 
 ```bash
 curl -X POST \
@@ -274,11 +345,11 @@ curl -X POST \
   "http://localhost:8787/sync/azure-devops/taskboard"
 ```
 
-Confirm tasks appear in the correct TickTick lists.
+Confirm tasks appear in the expected TickTick list(s).
 
 ### 6i. Local webhook testing
 
-GitHub and Azure DevOps need a **public HTTPS** URL for webhooks.
+Live webhooks need a **public HTTPS** URL.
 
 Options:
 
@@ -312,22 +383,32 @@ npx wrangler d1 create ticktick_sync
 
 ### 7c. Set production vars
 
-Update `wrangler.jsonc` with real values (same as local once list IDs are known).
+Update `wrangler.jsonc` with real values for the sources you enabled (same as local once list IDs are known).
 
 ### 7d. Set production secrets
+
+Always set:
 
 ```bash
 npx wrangler secret put TICKTICK_CLIENT_ID
 npx wrangler secret put TICKTICK_CLIENT_SECRET
 npx wrangler secret put DEBUG_TOKEN
+```
+
+Only if using GitHub:
+
+```bash
 npx wrangler secret put GITHUB_WEBHOOK_SECRET
-npx wrangler secret put GITHUB_TOKEN
+npx wrangler secret put GITHUB_TOKEN          # optional
+```
+
+Only if using Azure DevOps:
+
+```bash
 npx wrangler secret put AZURE_DEVOPS_PAT
 npx wrangler secret put AZURE_DEVOPS_WEBHOOK_USERNAME
 npx wrangler secret put AZURE_DEVOPS_WEBHOOK_SECRET
 ```
-
-Skip any secret for a source you are not using (except TickTick + `DEBUG_TOKEN`, which you always need).
 
 ### 7e. Apply remote migrations
 
@@ -351,7 +432,7 @@ https://ticktick-sync.<your-subdomain>.workers.dev
 
 ## 8. Production TickTick OAuth
 
-Local OAuth tokens do **not** carry over to production (separate D1 databases).
+Required for every deployment. Local OAuth tokens do **not** carry over to production (separate D1 databases).
 
 1. Add the production callback URI in the TickTick developer app:
 
@@ -374,7 +455,9 @@ curl -H "Authorization: Bearer YOUR_DEBUG_TOKEN" \
 
 ---
 
-## 9. Configure the GitHub webhook
+## 9. Configure the GitHub webhook (optional)
+
+Skip this section if you are not syncing GitHub.
 
 In the GitHub repo (or org / GitHub App):
 
@@ -402,7 +485,9 @@ curl -X POST \
 
 ---
 
-## 10. Configure Azure DevOps Service Hooks
+## 10. Configure Azure DevOps Service Hooks (optional)
+
+Skip this section if you are not syncing Azure DevOps.
 
 In Azure DevOps:
 
@@ -451,14 +536,16 @@ curl -X POST \
 
 ## 11. Verify end-to-end
 
-### GitHub
+Run only the checks for sources you enabled.
+
+### GitHub (if enabled)
 
 1. Open a new issue → TickTick task created in the GitHub list
 2. Edit the issue title → TickTick task title updates
 3. Close the issue → TickTick task completes
 4. Reopen the issue → new TickTick task is created and mapping is rewritten
 
-### Azure DevOps
+### Azure DevOps (if enabled)
 
 1. Create an unfulfilled Task/Bug on the current Taskboard → TickTick task in the ADO list
 2. Update title/state (still unfulfilled) → TickTick task updates
@@ -469,6 +556,7 @@ curl -X POST \
 
 ## 12. Operational notes
 
+- **Sources are independent.** You can run GitHub only, Azure DevOps only, or both.
 - **Local vs production D1 are separate.** Re-run OAuth and migrations in each environment.
 - **List routing**
   - GitHub → `GITHUB_TICKTICK_PROJECT_ID`
@@ -486,7 +574,7 @@ curl -X POST \
 |---------|----------------|
 | TickTick OAuth fails with redirect mismatch | Callback URI not registered exactly (including `http` vs `https`) |
 | `/debug/projects` returns 401 | Wrong or missing `DEBUG_TOKEN` Bearer header |
-| GitHub webhook 401 | `GITHUB_WEBHOOK_SECRET` mismatch |
+| GitHub webhook 401 | `GITHUB_WEBHOOK_SECRET` mismatch (or GitHub not configured) |
 | Azure DevOps webhook 401 | Basic auth username/password mismatch |
 | Azure DevOps webhook 403 | `AZURE_DEVOPS_WEBHOOK_SECRET` not configured on the Worker |
 | ADO backfill says org/project must be configured | Still using `YOUR_ORG` / `YOUR_PROJECT` placeholders |
@@ -502,7 +590,7 @@ curl -X POST \
 ```bash
 # Local
 npm install
-cp .dev.vars.example .dev.vars
+cp .dev.vars.example .dev.vars   # fill only the secrets you need
 npm run db:migrate:local
 npm run cf-typegen
 npm run dev
@@ -510,15 +598,21 @@ npm run dev
 # Production
 npx wrangler login
 npx wrangler secret put TICKTICK_CLIENT_ID
-# ...other secrets...
+npx wrangler secret put TICKTICK_CLIENT_SECRET
+npx wrangler secret put DEBUG_TOKEN
+# plus only the GitHub and/or Azure DevOps secrets you need
 npm run db:migrate:remote
 npm run deploy
 
-# Verify
+# Verify (always)
 curl https://<worker>/health
 curl -H "Authorization: Bearer $DEBUG_TOKEN" https://<worker>/debug/projects
+
+# Verify GitHub (only if enabled)
 curl -X POST -H "Authorization: Bearer $DEBUG_TOKEN" \
   "https://<worker>/sync/github/open-issues?repo=OWNER/REPO"
+
+# Verify Azure DevOps (only if enabled)
 curl -X POST -H "Authorization: Bearer $DEBUG_TOKEN" \
   "https://<worker>/sync/azure-devops/taskboard"
 ```

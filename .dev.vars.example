@@ -1,8 +1,13 @@
+# Always required
 TICKTICK_CLIENT_ID=your_ticktick_client_id
 TICKTICK_CLIENT_SECRET=your_ticktick_client_secret
-GITHUB_WEBHOOK_SECRET=your_github_webhook_secret
 DEBUG_TOKEN=your_debug_token
+
+# Only if using GitHub
+GITHUB_WEBHOOK_SECRET=your_github_webhook_secret
 GITHUB_TOKEN=optional_github_token
+
+# Only if using Azure DevOps
 AZURE_DEVOPS_PAT=your_azure_devops_pat
 AZURE_DEVOPS_WEBHOOK_USERNAME=ticktick-sync
 AZURE_DEVOPS_WEBHOOK_SECRET=your_azure_devops_webhook_secret

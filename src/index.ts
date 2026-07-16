@@ -263,12 +263,17 @@ app.get("/auth/ticktick/callback", async (c) => {
 });
 
 app.post("/webhooks/github", async (c) => {
+	const webhookSecret = c.env.GITHUB_WEBHOOK_SECRET?.trim();
+	if (!webhookSecret) {
+		return jsonError("GITHUB_WEBHOOK_SECRET must be configured.", 403);
+	}
+
 	const rawBody = await c.req.raw.text();
 	const signature = c.req.header("x-hub-signature-256");
 	const validSignature = await verifyGitHubSignature(
 		rawBody,
 		signature,
-		c.env.GITHUB_WEBHOOK_SECRET,
+		webhookSecret,
 	);
 
 	if (!validSignature) {

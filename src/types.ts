@@ -2,7 +2,7 @@ export interface AppBindings {
 	ticktick_sync: D1Database;
 	TICKTICK_CLIENT_ID: string;
 	TICKTICK_CLIENT_SECRET: string;
-	GITHUB_WEBHOOK_SECRET: string;
+	GITHUB_WEBHOOK_SECRET?: string;
 	GITHUB_TOKEN?: string;
 	GITHUB_TICKTICK_PROJECT_ID?: string;
 	AZURE_DEVOPS_TICKTICK_PROJECT_ID?: string;

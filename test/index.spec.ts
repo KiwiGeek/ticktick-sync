@@ -19,6 +19,26 @@ describe("ticktick-sync worker", () => {
 		});
 	});
 
+	it("rejects GitHub webhooks when the webhook secret is not configured", async () => {
+		const request = new IncomingRequest("https://example.com/webhooks/github", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-github-event": "issues",
+			},
+			body: JSON.stringify({ action: "opened" }),
+		});
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, {} as Env, ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(403);
+		expect(await response.json()).toMatchObject({
+			ok: false,
+			error: "GITHUB_WEBHOOK_SECRET must be configured.",
+		});
+	});
+
 	it("rejects GitHub webhooks with an invalid signature", async () => {
 		const request = new IncomingRequest("https://example.com/webhooks/github", {
 			method: "POST",
