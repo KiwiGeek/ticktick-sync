@@ -265,6 +265,34 @@
       outline-offset: 1px;
     }
 
+    .key-field-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .key-field-controls input {
+      flex: 1 1 220px;
+      min-width: 0;
+    }
+
+    .generate-secret-btn {
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--panel-strong) 92%, transparent);
+      color: var(--text);
+      padding: 10px 12px;
+      font: 12px/1.3 ui-sans-serif, system-ui, sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .generate-secret-btn:hover {
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    }
+
     .button-row {
       display: flex;
       gap: 12px;
@@ -394,6 +422,10 @@
     .callout.success {
       border-color: color-mix(in srgb, var(--success) 30%, var(--border));
       background: color-mix(in srgb, var(--success) 10%, var(--panel-strong));
+    }
+
+    .callout + .callout {
+      margin-top: 12px;
     }
 
     .code-block {
@@ -639,6 +671,11 @@
             <strong>Treat exports as secret</strong>
             If you fill these fields, exported JSON/PDF can contain live secrets. Store those files privately.
           </div>
+          <div class="callout success">
+            <strong>Generate random secrets here</strong>
+            Secret fields marked with <em>Generate</em> can invent a value in the browser.
+            Prefer <code>openssl rand -hex 32</code> when you can — browser-generated values are convenient, but not as cryptographically strong as OpenSSL.
+          </div>
           <div class="key-grid" id="keysForm"></div>
         </section>
 
@@ -878,14 +915,16 @@ npm run deploy</pre>
         key: "DEBUG_TOKEN",
         group: "always",
         kind: "secret",
-        hint: "Any long random string you invent, e.g. openssl rand -hex 32.",
+        generatable: true,
+        hint: "Any long random string. Use Generate, or prefer openssl rand -hex 32.",
         placeholder: "your_debug_token",
       },
       {
         key: "GITHUB_WEBHOOK_SECRET",
         group: "github",
         kind: "secret",
-        hint: "Same secret you will put in the GitHub webhook settings.",
+        generatable: true,
+        hint: "Same secret you will put in the GitHub webhook settings. Use Generate, or prefer openssl.",
         placeholder: "your_github_webhook_secret",
       },
       {
@@ -927,7 +966,8 @@ npm run deploy</pre>
         key: "AZURE_DEVOPS_WEBHOOK_SECRET",
         group: "azure",
         kind: "secret",
-        hint: "Basic-auth password for Service Hooks.",
+        generatable: true,
+        hint: "Basic-auth password for Service Hooks. Use Generate, or prefer openssl rand -hex 32.",
         placeholder: "your_azure_devops_webhook_secret",
       },
       {
@@ -1015,29 +1055,56 @@ npm run deploy</pre>
       return JSON.stringify(value).slice(1, -1);
     }
 
+    function generateBrowserSecret(byteLength = 32) {
+      const bytes = new Uint8Array(byteLength);
+      if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === "function") {
+        globalThis.crypto.getRandomValues(bytes);
+      } else {
+        for (let i = 0; i < bytes.length; i += 1) {
+          bytes[i] = Math.floor(Math.random() * 256);
+        }
+      }
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    function refreshKeyDependentSections() {
+      renderDevVars();
+      renderVarsSnippet();
+      renderSecretCommands();
+      renderVerifySection();
+      renderListGuidance();
+      bindCopies();
+    }
+
     function renderKeysForm() {
       const fields = visibleKeyFields();
       els.keysForm.innerHTML = fields
-        .map(
-          (field) => `
+        .map((field) => {
+          const generateBtn = field.generatable
+            ? `<button class="generate-secret-btn" type="button" data-generate-for="${field.key}" title="Browser-generated; prefer openssl rand -hex 32 when possible">Generate</button>`
+            : "";
+          return `
         <div class="key-field">
           <label for="key-${field.key}">
             <span><code>${field.key}</code></span>
             <span class="kind">${field.kind}</span>
           </label>
           <div class="hint">${field.hint}</div>
-          <input
-            id="key-${field.key}"
-            data-key-name="${field.key}"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="${escapeHtml(field.placeholder)}"
-            value="${escapeHtml(state.keys[field.key] || "")}"
-          />
+          <div class="key-field-controls">
+            <input
+              id="key-${field.key}"
+              data-key-name="${field.key}"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="${escapeHtml(field.placeholder)}"
+              value="${escapeHtml(state.keys[field.key] || "")}"
+            />
+            ${generateBtn}
+          </div>
         </div>
-      `,
-        )
+      `;
+        })
         .join("");
 
       els.keysForm.querySelectorAll("input[data-key-name]").forEach((input) => {
@@ -1045,12 +1112,23 @@ npm run deploy</pre>
           const keyName = input.getAttribute("data-key-name");
           if (!keyName) return;
           state.keys[keyName] = input.value;
-          renderDevVars();
-          renderVarsSnippet();
-          renderSecretCommands();
-          renderVerifySection();
-          renderListGuidance();
-          bindCopies();
+          refreshKeyDependentSections();
+        });
+      });
+
+      els.keysForm.querySelectorAll("[data-generate-for]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const keyName = button.getAttribute("data-generate-for");
+          if (!keyName) return;
+          const input = els.keysForm.querySelector(`#key-${CSS.escape(keyName)}`);
+          const value = generateBrowserSecret(32);
+          state.keys[keyName] = value;
+          if (input) {
+            input.value = value;
+            input.focus();
+            input.select();
+          }
+          refreshKeyDependentSections();
         });
       });
     }
@@ -1085,7 +1163,7 @@ npm run deploy</pre>
           <tbody>
             <tr><td><code>TICKTICK_CLIENT_ID</code></td><td>Secret</td><td>TickTick OAuth</td><td>TickTick Developer app</td></tr>
             <tr><td><code>TICKTICK_CLIENT_SECRET</code></td><td>Secret</td><td>TickTick OAuth</td><td>TickTick Developer app</td></tr>
-            <tr><td><code>DEBUG_TOKEN</code></td><td>Secret</td><td>Protecting debug and backfill endpoints</td><td>Create your own random secret, e.g. <code>openssl rand -hex 32</code></td></tr>
+            <tr><td><code>DEBUG_TOKEN</code></td><td>Secret</td><td>Protecting debug and backfill endpoints</td><td>Use <em>Generate</em> on this page, or prefer <code>openssl rand -hex 32</code></td></tr>
           </tbody>
         </table>
       `);
