@@ -1169,10 +1169,10 @@ npm run deploy</pre>
             <span class="kind">${field.kind}</span>
           </label>
           <div class="hint">${field.hint}</div>
-          <div class="where">
-            <strong>Where to get / generate it</strong>
-            ${field.where}
-          </div>
+          <details class="where">
+            <summary>Where to get / generate it</summary>
+            <div class="where-body">${field.where}</div>
+          </details>
           <div class="key-field-controls">
             <input
               id="key-${field.key}"
