@@ -966,8 +966,10 @@ npm install</pre>
               <strong>Apply local migrations and generate Worker types</strong>
               <div class="code-block">
                 <button class="copy-btn" data-copy-target="local-migrate">Copy</button>
-                <pre id="local-migrate">npm run db:migrate:local
+                <pre id="local-migrate">npm install
+npm run db:migrate:local
 npm run cf-typegen</pre>
+              <p class="footer-note">If Windows says <code>wrangler</code> is not recognized, you skipped <code>npm install</code> (or need a fresh terminal after it).</p>
               </div>
             </li>
             <li>
