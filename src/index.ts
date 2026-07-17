@@ -1,6 +1,14 @@
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
+import {
+	listOpenBoardWorkItems,
+	listUnfulfilledTaskboardWorkItems,
+	toSyncableFromWebhook,
+	toSyncableFromWorkItem,
+	verifyAzureDevOpsBasicAuth,
+	type SyncableAzureWorkItem,
+} from "./azure-devops";
 import { Database } from "./db";
 import {
 	buildTaskContent,
@@ -17,7 +25,12 @@ import {
 	listProjects,
 	updateTask,
 } from "./ticktick";
-import type { AppBindings, GitHubIssuePayload, SyncedItemRow } from "./types";
+import type {
+	AppBindings,
+	AzureDevOpsWebhookPayload,
+	GitHubIssuePayload,
+	SyncedItemRow,
+} from "./types";
 
 type AppEnv = {
 	Bindings: AppBindings;
@@ -25,7 +38,19 @@ type AppEnv = {
 
 type SyncAction = "created" | "updated" | "completed" | "ignored" | "recreated";
 
+type SyncableItem = {
+	source: string;
+	sourceRepo: string;
+	sourceItemId: string;
+	sourceItemNumber: number;
+	sourceUrl: string;
+	title: string;
+	content: string;
+	action: "opened" | "edited" | "closed" | "reopened";
+};
+
 const OAUTH_STATE_COOKIE = "ticktick_oauth_state";
+const AZURE_DEVOPS_SOURCE = "azure_devops_workitem";
 
 const app = new Hono<AppEnv>();
 
@@ -53,53 +78,84 @@ const requireDebugToken = (request: Request, env: AppBindings): Response | null 
 	return null;
 };
 
+const emptyActionCounts = (): Record<SyncAction, number> => ({
+	created: 0,
+	updated: 0,
+	completed: 0,
+	ignored: 0,
+	recreated: 0,
+});
+
 const buildSyncedItemRow = (
-	payload: GitHubIssuePayload,
+	item: SyncableItem,
 	tickTickTaskId: string,
 	status: string,
 	projectId: string,
 ): SyncedItemRow => ({
-	source: "github_issue",
-	source_repo: payload.repository.full_name,
-	source_item_id: String(payload.issue.id),
-	source_item_number: payload.issue.number,
-	source_url: payload.issue.html_url,
+	source: item.source,
+	source_repo: item.sourceRepo,
+	source_item_id: item.sourceItemId,
+	source_item_number: item.sourceItemNumber,
+	source_url: item.sourceUrl,
 	ticktick_project_id: projectId,
 	ticktick_task_id: tickTickTaskId,
 	status,
-	title: buildTaskTitle(payload),
+	title: item.title,
 	updated_at: new Date().toISOString(),
 });
 
-const syncIssueToTickTick = async (
+const isConfiguredProjectId = (value: string | undefined): value is string => {
+	const trimmed = value?.trim();
+	return Boolean(trimmed && !/^YOUR[_-]/i.test(trimmed));
+};
+
+const resolveTickTickProjectId = (env: AppBindings, source: string): string => {
+	if (source === AZURE_DEVOPS_SOURCE) {
+		if (isConfiguredProjectId(env.AZURE_DEVOPS_TICKTICK_PROJECT_ID)) {
+			return env.AZURE_DEVOPS_TICKTICK_PROJECT_ID.trim();
+		}
+	} else if (source === "github_issue") {
+		if (isConfiguredProjectId(env.GITHUB_TICKTICK_PROJECT_ID)) {
+			return env.GITHUB_TICKTICK_PROJECT_ID.trim();
+		}
+	}
+
+	if (isConfiguredProjectId(env.TICKTICK_PROJECT_ID)) {
+		return env.TICKTICK_PROJECT_ID.trim();
+	}
+
+	throw new Error(
+		source === AZURE_DEVOPS_SOURCE
+			? "AZURE_DEVOPS_TICKTICK_PROJECT_ID (or TICKTICK_PROJECT_ID) must be configured."
+			: "GITHUB_TICKTICK_PROJECT_ID (or TICKTICK_PROJECT_ID) must be configured.",
+	);
+};
+
+const syncItemToTickTick = async (
 	env: AppBindings,
-	payload: GitHubIssuePayload,
+	item: SyncableItem,
 ): Promise<{ action: SyncAction }> => {
 	const db = getDatabase(env);
-	const source = "github_issue";
-	const sourceItemId = String(payload.issue.id);
-	const title = buildTaskTitle(payload);
-	const content = buildTaskContent(payload);
-	const projectId = env.TICKTICK_PROJECT_ID;
-	const existing = await db.getSyncedItem(source, payload.repository.full_name, sourceItemId);
+	const projectId = resolveTickTickProjectId(env, item.source);
+	const existing = await db.getSyncedItem(item.source, item.sourceRepo, item.sourceItemId);
 
-	if (payload.action === "closed") {
+	if (item.action === "closed") {
 		if (existing) {
 			await completeTask(env, db, existing.ticktick_project_id, existing.ticktick_task_id);
 			await db.saveSyncedItem(
-				buildSyncedItemRow(payload, existing.ticktick_task_id, "completed", existing.ticktick_project_id),
+				buildSyncedItemRow(item, existing.ticktick_task_id, "completed", existing.ticktick_project_id),
 			);
 		}
 		return { action: existing ? "completed" : "ignored" };
 	}
 
-	if (payload.action === "reopened") {
+	if (item.action === "reopened") {
 		const recreated = await createTask(env, db, {
 			projectId,
-			title,
-			content,
+			title: item.title,
+			content: item.content,
 		});
-		await db.saveSyncedItem(buildSyncedItemRow(payload, recreated.id, "open", projectId));
+		await db.saveSyncedItem(buildSyncedItemRow(item, recreated.id, "open", projectId));
 		return { action: existing ? "recreated" : "created" };
 	}
 
@@ -107,23 +163,55 @@ const syncIssueToTickTick = async (
 		await updateTask(env, db, {
 			id: existing.ticktick_task_id,
 			projectId: existing.ticktick_project_id,
-			title,
-			content,
+			title: item.title,
+			content: item.content,
 		});
 		await db.saveSyncedItem(
-			buildSyncedItemRow(payload, existing.ticktick_task_id, "open", existing.ticktick_project_id),
+			buildSyncedItemRow(item, existing.ticktick_task_id, "open", existing.ticktick_project_id),
 		);
 		return { action: "updated" };
 	}
 
 	const created = await createTask(env, db, {
 		projectId,
-		title,
-		content,
+		title: item.title,
+		content: item.content,
 	});
-	await db.saveSyncedItem(buildSyncedItemRow(payload, created.id, "open", projectId));
+	await db.saveSyncedItem(buildSyncedItemRow(item, created.id, "open", projectId));
 	return { action: "created" };
 };
+
+const githubPayloadToSyncable = (payload: GitHubIssuePayload): SyncableItem => ({
+	source: "github_issue",
+	sourceRepo: payload.repository.full_name,
+	sourceItemId: String(payload.issue.id),
+	sourceItemNumber: payload.issue.number,
+	sourceUrl: payload.issue.html_url,
+	title: buildTaskTitle(payload),
+	content: buildTaskContent(payload),
+	action: payload.action as SyncableItem["action"],
+});
+
+const azurePayloadToSyncable = (item: SyncableAzureWorkItem): SyncableItem => ({
+	source: AZURE_DEVOPS_SOURCE,
+	sourceRepo: item.sourceRepo,
+	sourceItemId: String(item.workItem.id),
+	sourceItemNumber: item.workItem.id,
+	sourceUrl: item.sourceUrl,
+	title: item.title,
+	content: item.content,
+	action: item.action,
+});
+
+const syncIssueToTickTick = async (
+	env: AppBindings,
+	payload: GitHubIssuePayload,
+): Promise<{ action: SyncAction }> => syncItemToTickTick(env, githubPayloadToSyncable(payload));
+
+const syncAzureWorkItemToTickTick = async (
+	env: AppBindings,
+	item: SyncableAzureWorkItem,
+): Promise<{ action: SyncAction }> => syncItemToTickTick(env, azurePayloadToSyncable(item));
 
 app.get("/health", (c) =>
 	c.json({
@@ -176,12 +264,17 @@ app.get("/auth/ticktick/callback", async (c) => {
 });
 
 app.post("/webhooks/github", async (c) => {
+	const webhookSecret = c.env.GITHUB_WEBHOOK_SECRET?.trim();
+	if (!webhookSecret) {
+		return jsonError("GITHUB_WEBHOOK_SECRET must be configured.", 403);
+	}
+
 	const rawBody = await c.req.raw.text();
 	const signature = c.req.header("x-hub-signature-256");
 	const validSignature = await verifyGitHubSignature(
 		rawBody,
 		signature,
-		c.env.GITHUB_WEBHOOK_SECRET,
+		webhookSecret,
 	);
 
 	if (!validSignature) {
@@ -203,7 +296,7 @@ app.post("/webhooks/github", async (c) => {
 	const deliveryId = c.req.header("x-github-delivery");
 	const db = getDatabase(c.env);
 	if (deliveryId) {
-		const claim = await db.claimDelivery(deliveryId, event, payload.action);
+		const claim = await db.claimDelivery(deliveryId, "github", event, payload.action);
 		if (claim === "duplicate") {
 			return c.json({ ok: true, duplicate: true }, 200);
 		}
@@ -233,6 +326,85 @@ app.post("/webhooks/github", async (c) => {
 		}
 		return jsonError(
 			error instanceof Error ? error.message : "Failed to sync GitHub issue event.",
+			502,
+		);
+	}
+});
+
+app.post("/webhooks/azure-devops", async (c) => {
+	const webhookSecret = c.env.AZURE_DEVOPS_WEBHOOK_SECRET?.trim();
+	if (!webhookSecret) {
+		return jsonError("AZURE_DEVOPS_WEBHOOK_SECRET must be configured.", 403);
+	}
+
+	const username = c.env.AZURE_DEVOPS_WEBHOOK_USERNAME?.trim() ?? "";
+	const validAuth = verifyAzureDevOpsBasicAuth(
+		c.req.header("authorization"),
+		username,
+		webhookSecret,
+	);
+	if (!validAuth) {
+		return jsonError("Invalid Azure DevOps webhook credentials.", 401);
+	}
+
+	const rawBody = await c.req.raw.text();
+	let payload: AzureDevOpsWebhookPayload;
+	try {
+		payload = JSON.parse(rawBody) as AzureDevOpsWebhookPayload;
+	} catch {
+		return jsonError("Invalid Azure DevOps webhook payload.", 400);
+	}
+
+	const supportedEvents = new Set([
+		"workitem.created",
+		"workitem.updated",
+		"workitem.deleted",
+		"workitem.restored",
+	]);
+	if (!supportedEvents.has(payload.eventType)) {
+		return c.json(
+			{ ok: true, ignored: true, reason: `Unsupported event: ${payload.eventType}` },
+			202,
+		);
+	}
+
+	const deliveryId = payload.id ? `azure_devops:${payload.id}` : null;
+	const db = getDatabase(c.env);
+	if (deliveryId) {
+		const claim = await db.claimDelivery(
+			deliveryId,
+			"azure_devops",
+			payload.eventType,
+			null,
+		);
+		if (claim === "duplicate") {
+			return c.json({ ok: true, duplicate: true }, 200);
+		}
+		if (claim === "processing") {
+			return c.json({ ok: true, processing: true }, 202);
+		}
+	}
+
+	const syncable = await toSyncableFromWebhook(c.env, payload);
+	if ("ignored" in syncable) {
+		if (deliveryId) {
+			await db.completeDelivery(deliveryId, "processed");
+		}
+		return c.json({ ok: true, ignored: true, reason: syncable.reason }, 202);
+	}
+
+	try {
+		const result = await syncAzureWorkItemToTickTick(c.env, syncable);
+		if (deliveryId) {
+			await db.completeDelivery(deliveryId, "processed");
+		}
+		return c.json({ ok: true, result });
+	} catch (error) {
+		if (deliveryId) {
+			await db.completeDelivery(deliveryId, "failed");
+		}
+		return jsonError(
+			error instanceof Error ? error.message : "Failed to sync Azure DevOps work item event.",
 			502,
 		);
 	}
@@ -268,13 +440,7 @@ app.post("/sync/github/open-issues", async (c) => {
 
 	try {
 		const issues = await listOpenRepositoryIssues(c.env, repo);
-		const actionCounts: Record<SyncAction, number> = {
-			created: 0,
-			updated: 0,
-			completed: 0,
-			ignored: 0,
-			recreated: 0,
-		};
+		const actionCounts = emptyActionCounts();
 
 		for (const issue of issues) {
 			const result = await syncIssueToTickTick(c.env, toIssuePayload(repo, issue, "opened"));
@@ -291,6 +457,90 @@ app.post("/sync/github/open-issues", async (c) => {
 	} catch (error) {
 		return jsonError(
 			error instanceof Error ? error.message : "Failed to sync existing GitHub issues.",
+			502,
+		);
+	}
+});
+
+app.post("/sync/azure-devops/open-workitems", async (c) => {
+	const authError = requireDebugToken(c.req.raw, c.env);
+	if (authError) {
+		return authError;
+	}
+
+	const team = c.req.query("team")?.trim();
+
+	try {
+		const { workItems, team: resolvedTeam, source, excludedStates } =
+			await listOpenBoardWorkItems(c.env, { team });
+		const actionCounts = emptyActionCounts();
+
+		for (const workItem of workItems) {
+			const syncable = toSyncableFromWorkItem(c.env, workItem, "opened");
+			const result = await syncAzureWorkItemToTickTick(c.env, syncable);
+			actionCounts[result.action] += 1;
+		}
+
+		return c.json({
+			ok: true,
+			org: c.env.AZURE_DEVOPS_ORG,
+			project: c.env.AZURE_DEVOPS_PROJECT,
+			team: resolvedTeam,
+			source,
+			excludedStates,
+			note: "Closed / Done / Removed / Completed board items are intentionally skipped.",
+			totalWorkItems: workItems.length,
+			actionCounts,
+		});
+	} catch (error) {
+		return jsonError(
+			error instanceof Error
+				? error.message
+				: "Failed to sync open Azure DevOps work items.",
+			502,
+		);
+	}
+});
+
+app.post("/sync/azure-devops/taskboard", async (c) => {
+	const authError = requireDebugToken(c.req.raw, c.env);
+	if (authError) {
+		return authError;
+	}
+
+	const team = c.req.query("team")?.trim();
+
+	try {
+		const { workItems, iteration, team: resolvedTeam, source } =
+			await listUnfulfilledTaskboardWorkItems(c.env, { team });
+		const actionCounts = emptyActionCounts();
+
+		for (const workItem of workItems) {
+			const syncable = toSyncableFromWorkItem(c.env, workItem, "opened");
+			const result = await syncAzureWorkItemToTickTick(c.env, syncable);
+			actionCounts[result.action] += 1;
+		}
+
+		return c.json({
+			ok: true,
+			org: c.env.AZURE_DEVOPS_ORG,
+			project: c.env.AZURE_DEVOPS_PROJECT,
+			team: resolvedTeam,
+			iteration: {
+				id: iteration.id,
+				name: iteration.name,
+				path: iteration.path,
+			},
+			source,
+			note: "Closed / Done / Removed / Completed items are intentionally skipped.",
+			totalWorkItems: workItems.length,
+			actionCounts,
+		});
+	} catch (error) {
+		return jsonError(
+			error instanceof Error
+				? error.message
+				: "Failed to sync Azure DevOps taskboard work items.",
 			502,
 		);
 	}

@@ -1,8 +1,8 @@
 import type {
-	GitHubDeliveryRow,
 	OAuthTokenRow,
 	SyncedItemRow,
 	TickTickTokenResponse,
+	WebhookDeliveryRow,
 } from "./types";
 
 const nowIso = () => new Date().toISOString();
@@ -101,18 +101,19 @@ export class Database {
 
 	async claimDelivery(
 		deliveryId: string,
+		provider: string,
 		event: string,
 		action: string | null,
 	): Promise<"claimed" | "duplicate" | "processing"> {
 		const timestamp = nowIso();
 		const result = await this.db
 			.prepare(
-				`INSERT OR IGNORE INTO github_deliveries (
-				   delivery_id, event, action, status, received_at, updated_at
+				`INSERT OR IGNORE INTO webhook_deliveries (
+				   delivery_id, provider, event, action, status, received_at, updated_at
 				 )
-				 VALUES (?1, ?2, ?3, 'processing', ?4, ?4)`,
+				 VALUES (?1, ?2, ?3, ?4, 'processing', ?5, ?5)`,
 			)
-			.bind(deliveryId, event, action, timestamp)
+			.bind(deliveryId, provider, event, action, timestamp)
 			.run();
 
 		if ((result.meta.changes ?? 0) > 0) {
@@ -122,12 +123,12 @@ export class Database {
 		const existing =
 			await this.db
 				.prepare(
-					`SELECT delivery_id, event, action, status, received_at, updated_at
-					 FROM github_deliveries
+					`SELECT delivery_id, provider, event, action, status, received_at, updated_at
+					 FROM webhook_deliveries
 					 WHERE delivery_id = ?1`,
 				)
 				.bind(deliveryId)
-				.first<GitHubDeliveryRow>();
+				.first<WebhookDeliveryRow>();
 
 		if (existing?.status === "processed") {
 			return "duplicate";
@@ -139,7 +140,7 @@ export class Database {
 	async completeDelivery(deliveryId: string, status: "processed" | "failed"): Promise<void> {
 		await this.db
 			.prepare(
-				`UPDATE github_deliveries
+				`UPDATE webhook_deliveries
 				 SET status = ?2, updated_at = ?3
 				 WHERE delivery_id = ?1`,
 			)

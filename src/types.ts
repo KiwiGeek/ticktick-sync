@@ -2,11 +2,21 @@ export interface AppBindings {
 	ticktick_sync: D1Database;
 	TICKTICK_CLIENT_ID: string;
 	TICKTICK_CLIENT_SECRET: string;
-	GITHUB_WEBHOOK_SECRET: string;
+	GITHUB_WEBHOOK_SECRET?: string;
 	GITHUB_TOKEN?: string;
-	TICKTICK_PROJECT_ID: string;
+	GITHUB_TICKTICK_PROJECT_ID?: string;
+	AZURE_DEVOPS_TICKTICK_PROJECT_ID?: string;
+	/** @deprecated Prefer GITHUB_TICKTICK_PROJECT_ID / AZURE_DEVOPS_TICKTICK_PROJECT_ID. Kept as shared fallback. */
+	TICKTICK_PROJECT_ID?: string;
 	GITHUB_LOGIN: string;
 	DEBUG_TOKEN?: string;
+	AZURE_DEVOPS_ORG?: string;
+	AZURE_DEVOPS_PROJECT?: string;
+	AZURE_DEVOPS_TEAM?: string;
+	AZURE_DEVOPS_PAT?: string;
+	AZURE_DEVOPS_WEBHOOK_USERNAME?: string;
+	AZURE_DEVOPS_WEBHOOK_SECRET?: string;
+	AZURE_DEVOPS_WORK_ITEM_TYPES?: string;
 }
 
 export interface OAuthTokenRow {
@@ -30,14 +40,18 @@ export interface SyncedItemRow {
 	updated_at: string;
 }
 
-export interface GitHubDeliveryRow {
+export interface WebhookDeliveryRow {
 	delivery_id: string;
+	provider: string;
 	event: string;
 	action: string | null;
 	status: string;
 	received_at: string;
 	updated_at: string;
 }
+
+/** @deprecated Prefer WebhookDeliveryRow; kept for migration compatibility naming. */
+export type GitHubDeliveryRow = WebhookDeliveryRow;
 
 export interface GitHubIssuePayload {
 	action: string;
@@ -67,6 +81,47 @@ export interface GitHubApiIssue {
 	pull_request?: {
 		url: string;
 	};
+}
+
+export type AzureDevOpsWorkItemFields = Record<string, unknown>;
+
+export interface AzureDevOpsWorkItem {
+	id: number;
+	rev?: number;
+	url?: string;
+	fields?: AzureDevOpsWorkItemFields;
+	_links?: {
+		html?: { href?: string };
+		self?: { href?: string };
+	};
+}
+
+export interface AzureDevOpsTaskboardItem {
+	workItemId: number;
+	column?: string;
+	columnId?: string;
+	state?: string;
+}
+
+export interface AzureDevOpsWebhookPayload {
+	id?: string;
+	eventType: string;
+	publisherId?: string;
+	resource?: {
+		id?: number;
+		workItemId?: number;
+		rev?: number;
+		url?: string;
+		fields?: AzureDevOpsWorkItemFields;
+		revision?: AzureDevOpsWorkItem;
+		_links?: AzureDevOpsWorkItem["_links"];
+	};
+	resourceContainers?: {
+		account?: { id?: string; baseUrl?: string };
+		project?: { id?: string; baseUrl?: string };
+		collection?: { id?: string; baseUrl?: string };
+	};
+	createdDate?: string;
 }
 
 export interface TickTickTokenResponse {
